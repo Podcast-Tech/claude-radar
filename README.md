@@ -3,7 +3,7 @@
 A desk display for your Claude chats. An old Android phone (built for the Xiaomi Mi A3) shows whether each Claude Code chat is **working**, **needs you**, or **finished**, and vibrates or plays a sound when one changes. Recording mode keeps it silent.
 
 ```
-Claude Code on Windows ──(background hooks)──► Supabase ──(live)──► Android app
+Claude Code on Windows / Mac ──(background hooks)──► Supabase ──(live)──► Android app
 ```
 
 | Screen colour | Meaning |
@@ -43,6 +43,21 @@ To uninstall:
 $env:RADAR_UNINSTALL=1; irm https://raw.githubusercontent.com/Podcast-Tech/claude-radar/main/windows/install.ps1 | iex
 ```
 
+### 3. Mac (optional, e.g. the Mac mini at work)
+Open **Terminal** and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Podcast-Tech/claude-radar/main/mac/install.sh | bash
+```
+
+Sign in with the same account. Chats from every connected computer show on the phone, labelled with the computer's name. It uses the built-in `perl` and `curl`, so there's nothing to install.
+
+To uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Podcast-Tech/claude-radar/main/mac/install.sh | RADAR_UNINSTALL=1 bash
+```
+
 ## Updates
 The app checks GitHub Releases at launch and every 6 hours. Tap **Install** on the banner. Every release is signed with the same key, so it installs over the old version and keeps you signed in.
 
@@ -75,5 +90,6 @@ Hook errors are logged to `%USERPROFILE%\.claude-radar\hook-errors.log`.
 ## Repo layout
 - `app/`: Android app (Kotlin, Jetpack Compose, supabase-kt)
 - `windows/`: PowerShell installer and hook
+- `mac/`: macOS installer and hook (bash + perl)
 - `supabase/`: database schema and the `report` edge function
 - `.github/workflows/release.yml`: signed release builds
