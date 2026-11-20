@@ -127,12 +127,13 @@ Remove-RadarHooks $settings
 if (-not $settings.PSObject.Properties["hooks"]) {
     $settings | Add-Member -NotePropertyName hooks -NotePropertyValue (New-Object PSObject)
 }
+# Plain command string: works in every Claude Code version, whether it runs hooks through
+# Git Bash or PowerShell. Forward slashes keep the path safe in both shells.
+$hookPathFwd = $HookPath -replace '\\', '/'
 foreach ($ev in $Events) {
     $hook = [ordered]@{
         type    = "command"
-        command = "powershell.exe"
-        args    = @("-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
-                    "-File", $HookPath, $ev)
+        command = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$hookPathFwd`" $ev"
         async   = $true
         timeout = 15
     }

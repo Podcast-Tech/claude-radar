@@ -44,7 +44,7 @@ edit_settings() {
         }
         if ($mode eq "add") {
             for my $ev (qw(UserPromptSubmit PostToolUse Notification Stop StopFailure SessionEnd)) {
-                my $h = { type => "command", command => $perl, args => [$hook, $ev], async => JSON::PP::true, timeout => 15 };
+                my $h = { type => "command", command => qq{"$perl" "$hook" $ev}, async => JSON::PP::true, timeout => 15 };
                 my $g = { hooks => [$h] };
                 $g->{matcher} = "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input" if $ev eq "Notification";
                 push @{ $hooks->{$ev} }, $g;
