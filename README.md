@@ -58,6 +58,15 @@ To uninstall:
 curl -fsSL https://raw.githubusercontent.com/Podcast-Tech/claude-radar/main/mac/install.sh | RADAR_UNINSTALL=1 bash
 ```
 
+### 4. Claude Code on the web (cloud sessions)
+Cloud sessions run on Anthropic's servers, so they're set up through the cloud environment rather than a computer:
+1. In the environment's settings, add a **network secret** for host `dkfiyqacjdsvvbrcsabw.supabase.co`, header `x-radar-token`, value: a Radar token (its SHA-256 must be in `radar_tokens` for your account).
+2. Add this line to the environment's **setup script**:
+   ```bash
+   curl -fsSL -m 30 https://raw.githubusercontent.com/Podcast-Tech/claude-radar/main/cloud/install.sh | bash || true
+   ```
+New cloud sessions then report as **Cloud**. Tapping one on the phone opens that chat in the Claude app.
+
 ## Updates
 The app checks GitHub Releases at launch and every 6 hours. Tap **Install** on the banner. Every release is signed with the same key, so it installs over the old version and keeps you signed in.
 
@@ -91,5 +100,6 @@ Hook errors are logged to `%USERPROFILE%\.claude-radar\hook-errors.log`.
 - `app/`: Android app (Kotlin, Jetpack Compose, supabase-kt)
 - `windows/`: PowerShell installer and hook
 - `mac/`: macOS installer and hook (bash + perl)
+- `cloud/`: setup for Claude Code on the web (reuses the Mac hook)
 - `supabase/`: database schema and the `report` edge function
 - `.github/workflows/release.yml`: signed release builds
