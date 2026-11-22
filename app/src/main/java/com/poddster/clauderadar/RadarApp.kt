@@ -20,8 +20,9 @@ object Supa {
 }
 
 object Channels {
-    const val NEEDS_YOU = "needs_you"
-    const val FINISHED = "finished"
+    // v2: pop-up importance; the sound is played by the app itself (see Alerter).
+    const val NEEDS_YOU = "needs_you_v2"
+    const val FINISHED = "finished_v2"
     const val SILENT = "silent"
     const val SERVICE = "service"
 }
@@ -38,16 +39,17 @@ class RadarApp : Application() {
     override fun onCreate() {
         super.onCreate()
         val nm = getSystemService(NotificationManager::class.java)
+        listOf("needs_you", "finished").forEach { nm.deleteNotificationChannel(it) } // 1.0.0 channels
+        fun alertChannel(id: String, name: String, desc: String) =
+            NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
+                description = desc
+                setSound(null, null)   // the app plays the sound, so recording mode can silence it
+                enableVibration(false) // same for vibration
+            }
         nm.createNotificationChannels(
             listOf(
-                NotificationChannel(Channels.NEEDS_YOU, "Needs you", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "A chat is waiting for your answer or permission"
-                    enableVibration(false) // we vibrate ourselves so recording mode can silence it
-                },
-                NotificationChannel(Channels.FINISHED, "Finished", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "A chat finished its task"
-                    enableVibration(false)
-                },
+                alertChannel(Channels.NEEDS_YOU, "Needs you", "A chat is waiting for your answer or permission"),
+                alertChannel(Channels.FINISHED, "Finished", "A chat finished its task"),
                 NotificationChannel(Channels.SILENT, "Recording mode", NotificationManager.IMPORTANCE_LOW).apply {
                     description = "Updates while recording mode is on (no sound)"
                     setSound(null, null)

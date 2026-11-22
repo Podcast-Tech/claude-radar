@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -185,6 +186,10 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
     var updateProgress by remember { mutableStateOf<Float?>(null) }
     var updateMsg by remember { mutableStateOf<String?>(null) }
     val now by produceState(Instant.now()) { while (true) { delay(30_000); value = Instant.now() } }
+    var showChecks by remember { mutableStateOf(false) }
+    val checks by produceState(Alerter.checks(ctx)) { while (true) { value = Alerter.checks(ctx); delay(5_000) } }
+    var flash by remember { mutableStateOf<RadarSession?>(null) }
+    LaunchedEffect(Unit) { Alerter.flashes.collect { flash = it; delay(4_000); flash = null } }
 
     LaunchedEffect(Unit) { update = runCatching { Updater.check() }.getOrNull() }
 
@@ -199,7 +204,13 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
         Overall.WORKING -> DimBlue
         Overall.IDLE -> Color.Black
     }
-    val bg by animateColorAsState(target, label = "bg")
+    val flashColor = when (flash?.status) {
+        null -> null
+        "needs_you" -> Orange
+        "failed" -> Red
+        else -> Color.White
+    }
+    val bg by animateColorAsState(flashColor ?: target, label = "bg")
     val need = sessions.count { it.unseen && it.status == "needs_you" }
     val headline = when (overall) {
         Overall.NEEDS_YOU -> if (need == 1) "1 chat needs you" else "$need chats need you"
@@ -226,6 +237,8 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Menu", tint = Color.White) }
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Test alert") }, onClick = { menu = false; Alerter.test(ctx) })
+                    DropdownMenuItem(text = { Text("Alert check") }, onClick = { menu = false; showChecks = true })
                     DropdownMenuItem(text = { Text("Mark all as seen") }, onClick = { menu = false; scope.launch { RadarStore.markAllSeen() } })
                     DropdownMenuItem(text = { Text("Clear seen results") }, onClick = { menu = false; scope.launch { RadarStore.clearDone() } })
                     DropdownMenuItem(
@@ -252,6 +265,20 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
         Text(headline, color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Bold, lineHeight = 44.sp,
             modifier = Modifier.padding(top = 12.dp, bottom = 12.dp))
 
+        flash?.let { f ->
+            Banner {
+                Text("${f.displayTitle}: " + when (f.status) { "needs_you" -> "needs you"; "failed" -> "failed"; else -> "finished" },
+                    color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+            }
+        }
+        val blocked = checks.filter { !it.ok }
+        if (blocked.isNotEmpty()) {
+            Banner {
+                Text("Alerts may not reach you: " + blocked.joinToString { it.label.lowercase() },
+                    color = Color.White, modifier = Modifier.weight(1f))
+                TextButton(onClick = { showChecks = true }) { Text("Fix", color = Orange) }
+            }
+        }
         update?.let { rel ->
             Banner {
                 Column(Modifier.weight(1f)) {
@@ -289,6 +316,31 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
             }
             item { Spacer(Modifier.height(16.dp)) }
         }
+    }
+
+    if (showChecks) {
+        AlertDialog(
+            onDismissRequest = { showChecks = false },
+            title = { Text("Alert check") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    checks.forEach { c ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (c.ok) "✓" else "✗", color = if (c.ok) Green else Red, fontSize = 20.sp,
+                                modifier = Modifier.width(28.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(c.label, fontWeight = FontWeight.SemiBold)
+                                Text(c.detail, fontSize = 13.sp, color = Grey)
+                            }
+                            if (!c.ok) TextButton(onClick = { c.fix(ctx) }) { Text("Fix") }
+                        }
+                    }
+                    Text(if (connected) "Connection: live" else "Connection: reconnecting…", fontSize = 13.sp, color = Grey)
+                }
+            },
+            confirmButton = { TextButton(onClick = { Alerter.test(ctx) }) { Text("Test alert") } },
+            dismissButton = { TextButton(onClick = { showChecks = false }) { Text("Close") } },
+        )
     }
 }
 

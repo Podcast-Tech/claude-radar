@@ -49,7 +49,7 @@ class RadarService : Service() {
             RadarStore.start(scope)
         }
         scope.launch {
-            RadarStore.alerts.collect { alert(it.session) }
+            RadarStore.alerts.collect { Alerter.alert(this@RadarService, it.session) }
         }
         scope.launch {
             combine(RadarStore.sessions, RadarStore.connected) { s, c -> s to c }.collect { (list, up) ->
@@ -101,37 +101,6 @@ class RadarService : Service() {
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp())
             .build()
-
-    private fun alert(s: RadarSession) {
-        val recording = Prefs.recording(this)
-        val (channel, verb) = when (s.status) {
-            "needs_you" -> Channels.NEEDS_YOU to "needs you"
-            "failed" -> Channels.NEEDS_YOU to "failed"
-            else -> Channels.FINISHED to "finished"
-        }
-        val n = NotificationCompat.Builder(this, if (recording) Channels.SILENT else channel)
-            .setSmallIcon(R.drawable.ic_stat_radar)
-            .setContentTitle("${s.displayTitle} $verb")
-            .setContentText(s.message ?: listOfNotNull(s.project, s.machine).joinToString(" · "))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(s.message ?: ""))
-            .setColor(ContextCompat.getColor(this, android.R.color.holo_orange_dark))
-            .setAutoCancel(true)
-            .setContentIntent(openApp())
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .build()
-        nm.notify(s.sessionId.hashCode(), n)
-        if (!recording) vibrate(s.status == "needs_you" || s.status == "failed")
-    }
-
-    private fun vibrate(urgent: Boolean) {
-        val v: Vibrator = if (Build.VERSION.SDK_INT >= 31) {
-            getSystemService(VibratorManager::class.java).defaultVibrator
-        } else {
-            @Suppress("DEPRECATION") getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-        val pattern = if (urgent) longArrayOf(0, 250, 120, 250, 120, 400) else longArrayOf(0, 180)
-        v.vibrate(VibrationEffect.createWaveform(pattern, -1))
-    }
 
     private fun notifyUpdate(rel: Updater.Release) {
         val n = NotificationCompat.Builder(this, Channels.FINISHED)
