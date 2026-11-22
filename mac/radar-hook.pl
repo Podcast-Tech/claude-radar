@@ -82,13 +82,23 @@ eval {
         ($project = $in->{cwd}) =~ s{[/\\]+$}{};
         $project =~ s{^.*[/\\]}{};
     }
+    # Claude Code on the web: link back to the chat and label it as a cloud session.
+    my ($source, $url, $machine) = ('code', undef, $cfg->{machine});
+    if (($ENV{CLAUDE_CODE_REMOTE} // '') eq 'true') {
+        $source = 'cloud';
+        $machine = 'Cloud';
+        if (($ENV{CLAUDE_CODE_REMOTE_SESSION_ID} // '') =~ /^cse_(\w+)$/) {
+            $url = "https://claude.ai/code/session_$1";
+        }
+    }
     my %body = (
         session_id => $sid,
         status     => $status,
-        source     => 'code',
+        source     => $source,
+        url        => $url,
         title      => ($state->{title} || $project),
         project    => $project,
-        machine    => $cfg->{machine},
+        machine    => $machine,
         message    => $message,
         at         => int(time() * 1000),
     );
