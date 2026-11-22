@@ -21,18 +21,29 @@ object Updater {
         a * 10000 + b * 100 + c
     }.getOrNull()
 
+    /** Why the last check found nothing, in words for the user. */
+    @Volatile var lastCheckNote: String = ""
+
     suspend fun check(): Release? = withContext(Dispatchers.IO) {
+        lastCheckNote = ""
         val conn = URL("https://api.github.com/repos/${BuildConfig.GITHUB_REPO}/releases/latest")
             .openConnection() as HttpURLConnection
         conn.setRequestProperty("Accept", "application/vnd.github+json")
         conn.connectTimeout = 15_000
         conn.readTimeout = 15_000
         try {
-            if (conn.responseCode != 200) return@withContext null
+            when (conn.responseCode) {
+                200 -> {}
+                404 -> { lastCheckNote = "No releases published on GitHub yet"; return@withContext null }
+                else -> { lastCheckNote = "Couldn't reach GitHub (${conn.responseCode})"; return@withContext null }
+            }
             val json = JSONObject(conn.inputStream.bufferedReader().readText())
             val tag = json.getString("tag_name")
             val code = codeOf(tag) ?: return@withContext null
-            if (code <= BuildConfig.VERSION_CODE) return@withContext null
+            if (code <= BuildConfig.VERSION_CODE) {
+                lastCheckNote = "You're on the latest version (${BuildConfig.VERSION_NAME})"
+                return@withContext null
+            }
             val assets = json.getJSONArray("assets")
             val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
                 .firstOrNull { it.getString("name").endsWith(".apk") } ?: return@withContext null

@@ -249,8 +249,10 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                         menu = false
                         scope.launch {
                             updateMsg = null
-                            update = runCatching { Updater.check() }.getOrNull()
-                            if (update == null) updateMsg = "You're on the latest version (${BuildConfig.VERSION_NAME})"
+                            val r = runCatching { Updater.check() }
+                            update = r.getOrNull()
+                            if (update == null) updateMsg = r.exceptionOrNull()?.let { "Couldn't check for updates: no connection?" }
+                                ?: Updater.lastCheckNote.ifEmpty { "No update found" }
                         }
                     })
                     DropdownMenuItem(text = { Text("Sign out") }, onClick = {
