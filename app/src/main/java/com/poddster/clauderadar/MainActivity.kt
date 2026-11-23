@@ -254,11 +254,20 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                     }
                     addJavascriptInterface(
                         GoGoBridge(
-                            onTap = { id ->
+                            onSeen = { id -> scope.launch { RadarStore.markSeen(id) } },
+                            onOpen = { id ->
                                 val s = RadarStore.sessions.value.firstOrNull { it.sessionId == id }
                                 scope.launch { RadarStore.markSeen(id) }
-                                s?.url?.let { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
+                                val url = s?.url
+                                if (url != null) {
+                                    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                                } else {
+                                    android.widget.Toast.makeText(ctx,
+                                        "Marked read. This chat runs on ${s?.machine ?: "your computer"}, so open it there.",
+                                        android.widget.Toast.LENGTH_SHORT).show()
+                                }
                             },
+                            onSeenAll = { scope.launch { RadarStore.markAllSeen() } },
                             onRemove = { id -> scope.launch { RadarStore.remove(id) } },
                             onBoop = { if (!Prefs.recording(ctx)) Chirps.play("boop") },
                             onReady = { webReady = true; showWebHelp = false },

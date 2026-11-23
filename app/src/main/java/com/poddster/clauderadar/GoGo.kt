@@ -14,13 +14,17 @@ val GoGoJson = Json { encodeDefaults = true; explicitNulls = true }
 
 /** Calls from the GoGo page back into the app (always handled on the main thread). */
 class GoGoBridge(
-    private val onTap: (String) -> Unit,
+    private val onSeen: (String) -> Unit,
+    private val onOpen: (String) -> Unit,
+    private val onSeenAll: () -> Unit,
     private val onRemove: (String) -> Unit,
     private val onBoop: () -> Unit,
     private val onReady: () -> Unit,
 ) {
     private val main = Handler(Looper.getMainLooper())
-    @JavascriptInterface fun tap(id: String) { main.post { onTap(id) } }
+    @JavascriptInterface fun seen(id: String) { main.post { onSeen(id) } }
+    @JavascriptInterface fun open(id: String) { main.post { onOpen(id) } }
+    @JavascriptInterface fun seenAll() { main.post { onSeenAll() } }
     @JavascriptInterface fun remove(id: String) { main.post { onRemove(id) } }
     @JavascriptInterface fun boop() { main.post { onBoop() } }
     @JavascriptInterface fun ready() { main.post { onReady() } }
