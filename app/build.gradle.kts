@@ -24,6 +24,8 @@ android {
         // Publishable key: safe to ship in an app. Data is protected by row-level security + login.
         buildConfigField("String", "SUPABASE_KEY", "\"sb_publishable_QYuYaLDjC6862ClbKyhO7w_gDTdHEct\"")
         buildConfigField("String", "GITHUB_REPO", "\"Podcast-Tech/claude-radar\"")
+        // Speech engine native code: phones only (ARM), keeps the APK small.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     // One signing key for every release, so updates install over the previous version.
@@ -60,6 +62,9 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:realtime-kt")
     implementation("io.ktor:ktor-client-okhttp:3.1.3")
+    // Offline speech recognition for "Hey GoGo" (runs on the phone)
+    implementation("com.alphacephei:vosk-android:0.3.47")
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
 
     implementation(platform("androidx.compose:compose-bom:2025.05.01"))
     implementation("androidx.compose.ui:ui")

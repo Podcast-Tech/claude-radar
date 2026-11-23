@@ -79,6 +79,39 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 .puff { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #9aa3b8; opacity: 0; animation: puff 2.4s ease-out infinite; }
 @keyframes puff { 0% { transform: translate(0,0) scale(.4); opacity: .7; } 100% { transform: translate(var(--dx, 10px), -60px) scale(1.8); opacity: 0; } }
 
+
+/* ---------- GoGo talks ---------- */
+.say { position: absolute; left: 0; right: 0; margin: 0 auto; width: -webkit-max-content; width: max-content; top: 40px; z-index: 6; max-width: 86%;
+  background: #fff; color: #1b2033; border-radius: 18px; padding: 10px 14px; font-family: var(--display); font-weight: 600;
+  font-size: 17px; font-size: clamp(14px, 2.2vmin + 8px, 20px); line-height: 1.25; box-shadow: 0 10px 30px -10px #000;
+  animation: pop .4s cubic-bezier(.2, 1.6, .4, 1) both; pointer-events: none; text-align: center; }
+.say::after { content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -9px; border: 9px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.say.you { background: #22304f; color: #e8eefc; }
+.say.you::after { border-top-color: #22304f; }
+.say .dots i { display: inline-block; width: 6px; height: 6px; margin: 0 2px; border-radius: 50%; background: currentColor; animation: pulse 1s infinite; }
+.say .dots i:nth-child(2) { animation-delay: .15s; } .say .dots i:nth-child(3) { animation-delay: .3s; }
+.gg.listening .dish-face { animation: scan .35s linear infinite !important; }
+.gg.listening .eyes-x { transform: translateY(-3px); }
+.ears { position: absolute; left: 50%; top: 55%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; pointer-events: none; display: none; z-index: 0; }
+.gogo-zone .drift { position: relative; z-index: 1; }
+.listening-on .ears { display: block; animation: ring 1.4s ease-out infinite; box-shadow: 0 0 0 0 rgba(90,168,255,.6); }
+@keyframes ring { from { box-shadow: 0 0 0 0 rgba(90,168,255,.55); } to { box-shadow: 0 0 0 30vmin rgba(90,168,255,0); } }
+
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 0 14px 10px; flex-wrap: wrap; pointer-events: none; }
+.dock > * { pointer-events: auto; }
+.dock .chip, .dock .round { background: #ffffff16; border: 1px solid #ffffff26; color: #e6ecfa; border-radius: 999px; font-family: var(--display);
+  font-weight: 600; font-size: 14px; padding: 8px 13px; white-space: nowrap; }
+.dock .round { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; font-size: 18px; }
+.dock .round.live { background: #5aa8ff; border-color: #5aa8ff; color: #06101f; }
+.dock .spacer { flex: 1; }
+.dock .handle { position: static; transform: none; }
+.ask { display: none; position: fixed; left: 12px; right: 12px; bottom: 60px; z-index: 9; }
+.ask.open { display: flex; gap: 8px; }
+.ask input { flex: 1; min-width: 0; border-radius: 999px; border: 1px solid #ffffff33; background: #121a2b; color: #fff; font: 600 16px var(--body); padding: 10px 16px; outline: none; }
+.ask button { border-radius: 999px; border: 0; background: #5aa8ff; color: #06101f; font: 700 15px var(--display); padding: 0 18px; }
+.recording .dock .round.mic { opacity: .4; }
+.portrait .card-zone { padding-bottom: 110px; }
+
 /* swipe-up sheet with every chat */
 .handle { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 6; background: #ffffff16; border: 1px solid #ffffff26;
   color: #dfe6f5; border-radius: 999px; padding: 8px 16px; font-family: var(--display); font-weight: 600; font-size: 14px; }
@@ -342,11 +375,23 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
       </button>
     </div>
     <div class="fx" id="fx"></div>
+    <div class="ears"></div>
+    <div class="say" id="say" hidden></div>
   </div>
   <div class="card-zone" id="cards"></div>
 </div>
 <canvas id="confetti"></canvas>
-<button class="handle" id="handle">All chats</button>
+<div class="dock" id="dock">
+  <button class="chip" data-say="Hi GoGo!">👋 Hi</button>
+  <button class="chip" data-say="Who are you?">Who are you?</button>
+  <button class="chip" data-say="What's up?">What's up?</button>
+  <button class="chip" data-say="Tell me a joke">Joke</button>
+  <button class="round mic" id="micBtn" aria-label="Talk to GoGo">🎤</button>
+  <button class="round" id="kbdBtn" aria-label="Type to GoGo">⌨</button>
+  <span class="spacer"></span>
+  <button class="handle" id="handle">All chats</button>
+</div>
+<form class="ask" id="ask"><input id="askInput" autocomplete="off" placeholder="Say something to GoGo…" maxlength="140"><button>Send</button></form>
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="sheet" aria-label="All chats">
   <header><div class="sheet-head"><h2>All chats <small id="sheetCount"></small></h2><button class="more act" id="allRead" data-act="all" hidden>Mark all read</button></div></header>
@@ -355,7 +400,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 
 <script>
 (() => {
-  const A = window.Android || { seen(){}, open(){}, seenAll(){}, remove(){}, boop(){}, ready(){} };
+  const A = window.Android || { seen(){}, open(){}, seenAll(){}, remove(){}, boop(){}, ready(){}, speak(){}, listen(){}, setRecording(){} };
   const $ = id => document.getElementById(id);
   const screen = $('screen'), gogo = $('gogo'), cards = $('cards'), fx = $('fx');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -468,7 +513,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
     $('live').textContent = state.connected ? 'Live' : 'Reconnecting…';
     $('live').classList.toggle('off', !state.connected);
     screen.classList.toggle('offline', !state.connected);
-    renderCards(); renderOrbit(); renderSheet(); renderTally();
+    renderCards(); renderOrbit(); renderSheet(); renderTally(); if (typeof moments === 'function') moments();
   }
 
   function addZ() {
@@ -510,6 +555,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
   $('gogoBtn').addEventListener('click', () => {
     gogo.classList.remove('boop'); void gogo.getBBox(); gogo.classList.add('boop'); A.boop();
     if (shown) A.seen(shown.session_id);
+    else if (typeof say === 'function' && Math.random() < .5) say(pick(['Boop! 💙', 'Hehe, that tickles!', 'Beep beep! 📡', '*happy wiggle*']), { speak: false });
     setTimeout(() => gogo.classList.remove('boop'), 900);
   });
 
@@ -557,12 +603,149 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
   addEventListener('resize', layout); layout(); setTimeout(layout, 300);
   setInterval(render, 30000); // refresh "x min ago" and night mode
 
+
+  // ================= GoGo talks =================
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const sayEl = $('say');
+  let sayTimer = 0, lastChatter = Date.now();
+  function say(text, { speak = true, you = false, sticky = false } = {}) {
+    clearTimeout(sayTimer);
+    sayEl.className = 'say' + (you ? ' you' : ''); sayEl.innerHTML = text; sayEl.hidden = false;
+    void sayEl.offsetWidth; sayEl.style.animation = 'none'; void sayEl.offsetWidth; sayEl.style.animation = '';
+    if (speak && !you) A.speak(sayEl.textContent);
+    if (!sticky) sayTimer = setTimeout(() => { sayEl.hidden = true; }, 3500 + text.length * 55);
+    lastChatter = Date.now();
+  }
+  function wiggle(kind) {
+    gogo.classList.remove('boop'); void gogo.getBBox(); gogo.classList.add('boop');
+    setTimeout(() => gogo.classList.remove('boop'), 900);
+    if (kind === 'party') confetti();
+  }
+  const name = s => esc(title(s));
+  function counts() {
+    const L = state.sessions, u = st => L.filter(s => unseen(s) && s.status === st);
+    return { need: u('needs_you'), done: u('finished'), fail: u('failed'), work: L.filter(s => s.status === 'working') };
+  }
+  function statusLine() {
+    const c = counts(), bits = [];
+    if (c.need.length) bits.push(`${c.need.length} need${c.need.length > 1 ? '' : 's'} you`);
+    if (c.fail.length) bits.push(`${c.fail.length} failed`);
+    if (c.done.length) bits.push(`${c.done.length} finished`);
+    if (c.work.length) bits.push(`${c.work.length} cooking`);
+    if (!bits.length) return pick(["All quiet on the radar! Nothing needs you right now. 😌", "Zero alerts, zero worries. Want a joke while we wait?", "Nothing's beeping. Enjoy the calm! ☕"]);
+    let line = `Radar report: ${bits.join(', ')}.`;
+    if (c.need.length) line += ` Newest: “${name(c.need[0])}” is waiting for you!`;
+    else if (c.fail.length) line += ` “${name(c.fail[0])}” hit a bump.`;
+    else if (c.done.length) line += ` “${name(c.done[0])}” is ready! 🎉`;
+    return line;
+  }
+  const jokes = [
+    "Why did the podcast mic blush? It saw the pop filter! 🎙️",
+    "What's a robot's favourite podcast? The Byte Show! 🤖",
+    "Why don't radars ever get lost? They always pick up the signal! 📡",
+    "I tried to edit a podcast once… I cut so much ‘um’ there was nothing left. 😅",
+    "Why was the audio file so calm? It had great compression! 🎚️",
+    "What do you call a sleepy robot? A nap-top! 💤",
+  ];
+  const intents = [
+    [/who are you|what are you|your name|introduce/, () => { wiggle(); return "I'm GoGo! 📡 A tiny radar bot who keeps an eye on your Claude chats, so you don't have to. I hop when one needs you and throw confetti when one's done!"; }],
+    [/how are you|how('?| a)re you|you ok|how do you feel/, () => {
+      const m = { needs: "A little jumpy! Someone needs you! 😳", failed: "Bit dizzy… a chat tripped over. 😵", finished: "Super happy! Something just finished! 🥳",
+        working: "Busy busy! Watching my chats cook. 🍳", recording: "Very quiet, very professional. 🤫", sleep: "Cozy and calm! 😌" };
+      return m[mood] || "Great! Thanks for asking! 💙";
+    }],
+    [/what('?s| is) up|status|update|news|report|how many|going on|anything new|what('?s| is) happening/, statusLine],
+    [/need(s)? me|waiting|my turn|anything for me/, () => {
+      const c = counts();
+      return c.need.length ? `Yes! ${c.need.map(s => `“${name(s)}”`).slice(0, 3).join(', ')} ${c.need.length > 1 ? 'need' : 'needs'} you! Double-tap the card to open it.` : "Nope! Nothing needs you right now. Go grab a coffee! ☕";
+    }],
+    [/finished|done|ready|complete/, () => {
+      const c = counts();
+      return c.done.length ? `${c.done.length} finished: ${c.done.map(s => `“${name(s)}”`).slice(0, 3).join(', ')}! 🎉` : "Nothing new has finished yet. I'll throw confetti when it does!";
+    }],
+    [/joke|funny|laugh|make me smile/, () => { wiggle(); return pick(jokes); }],
+    [/thank|thanks|good (girl|job|bot)|well done|nice/, () => { wiggle(); return pick(["Aww! 🥹 Anytime!", "*happy beeps* You're welcome!", "That made my antenna wiggle! 💙"]); }],
+    [/love you|cute|adorable|pretty|best/, () => { wiggle(); return pick(["Stop it, my antenna is blushing! 😳💗", "You're the best producer on my radar! 💙", "Eeee! 💗 *spins dish happily*"]); }],
+    [/sing|dance|party|celebrate/, () => { wiggle('party'); return "🎶 Beep boop, la la loop, every chat is in the group! 🎶"; }],
+    [/\b(what time|the time|clock)\b/, () => `It's ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}! ⏰`],
+    [/clear|mark (all )?(as )?read|all read|dismiss/, () => { A.seenAll(); wiggle(); return "All clean! ✨ Radar is sparkly."; }],
+    [/\b(recording mode|start recording|we('?re| are) recording|i('?m| am) recording)\b/, () => { A.setRecording(true); return "Shh mode on! 🤫 My ears and voice are off until you stop recording."; }],
+    [/(good ?night|bye|see you|sleep|nap)/, () => pick(["Nighty night! 🌙 I'll keep one eye on the radar.", "Bye bye! 👋 Come back soon!", "Sweet dreams! 💤"])],
+    [/help|what can you do|commands/, () => "Try: “What's up?”, “Anything need me?”, “What's finished?”, “Clear all”, “Tell me a joke”, or just say hi! 💙"],
+    [/\b(hi|hello|hey|hiya|yo|salam|marhaba|ahlan|morning|evening)\b/, () => {
+      const h = new Date().getHours();
+      const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      wiggle(); return pick([`Hiii! 👋 ${greet}! GoGo here, antenna fully charged!`, `Hey hey! 💙 ${greet}! Ready to watch your chats!`, `Oh hi! *happy beep* ${greet}!`]);
+    }],
+    [/^(yes|yeah|yep|ok(ay)?|sure|cool)\b/, () => pick(["Yay! 🎉", "Okie dokie! 💙", "Beep beep, got it!"])],
+    [/^(no|nope|nah)\b/, () => pick(["Okay okay! 🙈", "No worries!", "Fair enough! 😄"])],
+  ];
+  function reply(text) {
+    const t = (text || '').toLowerCase().replace(/go ?go/g, '').trim();
+    if (!t) return pick(["Hmm? My antenna didn't catch that. Try again? 👂", "Say that again? I was busy spinning my dish! 📡"]);
+    for (const [re, fn] of intents) if (re.test(t)) return fn();
+    return pick(["Hmm, that one's above my antenna! 🤔 Try “What's up?” or “Tell me a joke”.",
+      "Ooh, I don't know that yet! I'm a tiny robot. 🤖 Ask me what's up?",
+      "Beep? 🙃 I only know a few things. Say “help” to see them!"]);
+  }
+  function talk(text, { heard = false } = {}) {
+    if (text) say(esc(text), { you: true });
+    setTimeout(() => say(reply(text)), text ? 700 : 0);
+  }
+
+  // dock: chips, mic, keyboard
+  $('dock').addEventListener('click', e => {
+    const c = e.target.closest('[data-say]'); if (c) talk(c.dataset.say);
+  });
+  $('micBtn').addEventListener('click', () => A.listen());
+  $('kbdBtn').addEventListener('click', () => { $('ask').classList.toggle('open'); if ($('ask').classList.contains('open')) $('askInput').focus(); });
+  $('ask').addEventListener('submit', e => { e.preventDefault(); const v = $('askInput').value.trim(); $('askInput').value = ''; $('ask').classList.remove('open'); $('askInput').blur(); if (v) talk(v); });
+
+  // little moments on her own (text only, no voice, so she doesn't chatter out loud)
+  let prevMood = null;
+  function moments() {
+    if (prevMood && mood !== prevMood) {
+      const c = counts();
+      if (mood === 'finished' && c.done[0]) say(pick([`Ta-da! “${name(c.done[0])}” is done! 🎉`, `Woohoo! “${name(c.done[0])}” finished! 🥳`]), { speak: false });
+      if (mood === 'needs' && c.need[0]) say(pick([`Psst! “${name(c.need[0])}” needs you! 👀`, `Hey hey! “${name(c.need[0])}” is waiting! 🙋‍♀️`]), { speak: false });
+      if (mood === 'failed' && c.fail[0]) say(`Uh oh… “${name(c.fail[0])}” tripped. 😵`, { speak: false });
+      if (mood === 'working' && prevMood === 'sleep') say(pick(["Ooh, work time! 💪", "Yawn… I'm up, I'm up! 📡"]), { speak: false });
+    }
+    prevMood = mood;
+  }
+  setInterval(() => {
+    if (Date.now() - lastChatter < 25 * 60000 || !sayEl.hidden || mood === 'recording') return;
+    const h = new Date().getHours();
+    say(pick([
+      mood === 'sleep' ? "*soft snore* … 💤" : "Still watching! 📡",
+      h < 11 ? "Morning! Coffee first, then podcasts. ☕" : h > 20 ? "It's getting late… don't forget to rest! 🌙" : "Stretch break? Your back will thank you! 🙆",
+      "Tap me anytime! I like boops. 💙",
+    ]), { speak: false });
+  }, 60000);
+  setTimeout(() => {
+    const h = new Date().getHours();
+    say(`${h < 12 ? 'Good morning' : h < 18 ? 'Hi there' : 'Good evening'}! 💙 GoGo's on duty.`, { speak: false });
+  }, 1200);
+
   window.gogo = {
     update(s) {
       state = s; const key = JSON.stringify(s);
       if (key !== lastKey) { lastKey = key; render(); }
     },
     celebrate() { if (mood === 'finished') confetti(); },
+    say(text) { say(esc(text)); },
+    wake() { say(pick(["Yes? 👂", "I'm listening! 👂", "Hiii? 👂"]), { sticky: true, speak: false }); },
+    heard(text) { if (text) talk(text, { heard: true }); else say("Hmm? I didn't catch that. 👂", { speak: false }); },
+    voice(st, p) {
+      const listening = st === 'listening';
+      gogo.classList.toggle('listening', listening);
+      document.querySelector('.gogo-zone').classList.toggle('listening-on', listening);
+      $('micBtn').classList.toggle('live', listening || st === 'wake');
+      $('micBtn').title = st === 'wake' ? 'Listening for “Hey GoGo”' : '';
+      if (listening && sayEl.hidden) say('<span class="dots"><i></i><i></i><i></i></span>', { sticky: true, speak: false });
+      if (st === 'downloading') say(`Learning to hear… ${Math.round(p * 100)}% 📚`, { sticky: true, speak: false });
+      if (st === 'wake' && sayEl.innerHTML.indexOf('dots') >= 0) sayEl.hidden = true;
+    },
   };
   render();
   A.ready();

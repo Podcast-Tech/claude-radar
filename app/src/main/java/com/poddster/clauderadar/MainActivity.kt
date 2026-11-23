@@ -59,6 +59,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -232,6 +233,50 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
         if (webReady) Alerter.flashes.collect { web?.evaluateJavascript("window.gogo && gogo.celebrate()", null) }
     }
 
+    // ---- GoGo's voice and ears ----
+    var talkAloud by remember { mutableStateOf(Prefs.talkAloud(ctx)) }
+    var listenWake by remember { mutableStateOf(Prefs.listenWake(ctx)) }
+    var resumed by remember { mutableStateOf(true) }
+    val js: (String) -> Unit = { code -> web?.evaluateJavascript("window.gogo && $code", null) }
+    val quote: (String) -> String = { org.json.JSONObject.quote(it) }
+    LaunchedEffect(Unit) {
+        Speaker.init(ctx)
+        Speaker.onSpeakingChanged = { speaking ->
+            android.os.Handler(android.os.Looper.getMainLooper()).post { if (speaking) Ears.pause() else Ears.unpause() }
+        }
+    }
+    DisposableEffect(webReady) {
+        Ears.listener = object : Ears.Listener {
+            override fun onState(state: Ears.State, progress: Float) { js("gogo.voice(${quote(state.name.lowercase())}, $progress)") }
+            override fun onWake() { if (!Prefs.recording(ctx)) Chirps.play("boop"); js("gogo.wake()") }
+            override fun onHeard(text: String) { js("gogo.heard(${quote(text)})") }
+        }
+        onDispose { Ears.listener = null }
+    }
+    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) resumed = true
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) resumed = false
+        }
+        lifecycle.addObserver(obs)
+        onDispose { lifecycle.removeObserver(obs) }
+    }
+    val hasMic = { androidx.core.content.ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) ==
+        android.content.pm.PackageManager.PERMISSION_GRANTED }
+    // Listen for "Hey GoGo" only while GoGo is on screen, switched on, and not recording.
+    LaunchedEffect(listenWake, resumed, recording, webReady) {
+        if (listenWake && resumed && !recording && webReady && hasMic()) Ears.ensureModel(ctx, scope) { Ears.startWake() }
+        else if (Ears.state != Ears.State.OFF) Ears.stop()
+    }
+    var pendingMic by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val micPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) pendingMic?.invoke() else js("gogo.say(\"I can't hear without the microphone permission. Turn it on in Settings, then try again!\")"); pendingMic = null }
+    val withMic: (() -> Unit) -> Unit = { action ->
+        if (hasMic()) action() else { pendingMic = action; micPermission.launch(Manifest.permission.RECORD_AUDIO) }
+    }
+
     Box(Modifier.fillMaxSize().background(Color(0xFF070A12))) {
         AndroidView(
             modifier = Modifier.fillMaxSize().systemBarsPadding(),
@@ -269,6 +314,12 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                             },
                             onSeenAll = { scope.launch { RadarStore.markAllSeen() } },
                             onRemove = { id -> scope.launch { RadarStore.remove(id) } },
+                            onSpeak = { text -> if (Prefs.talkAloud(ctx) && !Prefs.recording(ctx)) Speaker.speak(text) },
+                            onListen = {
+                                if (Prefs.recording(ctx)) js("gogo.say(\"Shh, we're recording! My ears are off.\")")
+                                else withMic { Ears.ensureModel(ctx, scope) { Speaker.stop(); Ears.startCommand() } }
+                            },
+                            onRecording = { on -> recording = on; Prefs.setRecording(ctx, on) },
                             onBoop = { if (!Prefs.recording(ctx)) Chirps.play("boop") },
                             onReady = { webReady = true; showWebHelp = false },
                         ),
@@ -332,6 +383,18 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                             val next = listOf(5, 10, 30, 0).let { it[(it.indexOf(restMins) + 1) % it.size] }
                             restMins = next; Prefs.setAutoRestMinutes(ctx, next)
                         },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (listenWake) "Listening for \"Hey GoGo\": on" else "Listen for \"Hey GoGo\"") },
+                        onClick = {
+                            menu = false
+                            if (listenWake) { listenWake = false; Prefs.setListenWake(ctx, false) }
+                            else withMic { listenWake = true; Prefs.setListenWake(ctx, true) }
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (talkAloud) "GoGo talks out loud: on" else "GoGo talks out loud: off") },
+                        onClick = { talkAloud = !talkAloud; Prefs.setTalkAloud(ctx, talkAloud); if (!talkAloud) Speaker.stop() },
                     )
                     DropdownMenuItem(text = { Text("Mark all as seen") }, onClick = { menu = false; scope.launch { RadarStore.markAllSeen() } })
                     DropdownMenuItem(text = { Text("Clear seen results") }, onClick = { menu = false; scope.launch { RadarStore.clearDone() } })
