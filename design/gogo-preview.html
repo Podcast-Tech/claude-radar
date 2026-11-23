@@ -1,0 +1,578 @@
+<title>GoGo Desk Companion</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+/* Layout: a phone-shaped stage (landscape by default) with GoGo on the left and the
+   chat card on the right; mood controls sit under the stage. Single dark look:
+   it's a desk display, and black saves the Mi A3's OLED screen. */
+:root {
+  color-scheme: dark;
+  --ink: #0d1220;          /* page */
+  --night: #070a12;        /* stage when asleep */
+  --panel: #161d2e;        /* controls, cards */
+  --line: #263049;
+  --text: #eef2fa;
+  --muted: #8e9ab3;
+  --shell: #e8edf6;        /* GoGo body */
+  --shell-shade: #c3cde0;
+  --visor: #121826;        /* GoGo face screen */
+  --working: #5aa8ff;
+  --needs: #ffb21e;
+  --finished: #3ee0a0;
+  --failed: #ff5d62;
+  --rec: #ff6fa8;
+  --sleep: #7c86ff;
+  --mood: var(--sleep);
+  --display: "Fredoka", "Baloo 2", ui-rounded, "Arial Rounded MT Bold", system-ui, sans-serif;
+  --body: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ink); color: var(--text); }
+body { font-family: var(--body); font-size: 15px; line-height: 1.5; }
+
+.wrap {
+  max-width: 1080px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+  display: grid; gap: 22px;
+}
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+header h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 5vw, 44px); line-height: 1; margin: 0; letter-spacing: .5px; }
+header h1 span { color: var(--working); }
+header p { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button { font: inherit; color: inherit; cursor: pointer; }
+.pill {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 14px; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px;
+}
+.pill:hover { border-color: #3a4766; }
+.pill:focus-visible, .mood:focus-visible, #gogoBtn:focus-visible { outline: 3px solid var(--working); outline-offset: 2px; }
+.pill[aria-pressed="true"] { background: #22304f; border-color: var(--working); }
+
+/* ---------- Stage (the phone) ---------- */
+.device {
+  justify-self: center; width: 100%; max-width: 100%;
+  background: #05070c; border-radius: 34px; padding: 12px;
+  box-shadow: 0 0 0 2px #1c2335, 0 30px 80px -30px #000;
+}
+.device.landscape { aspect-ratio: 19.5 / 9; }
+.device.portrait { aspect-ratio: 9 / 19.5; width: min(100%, 360px); }
+.screen {
+  position: relative; width: 100%; height: 100%; border-radius: 24px; overflow: hidden;
+  background:
+    radial-gradient(60% 80% at 28% 55%, color-mix(in srgb, var(--mood) 30%, transparent), transparent 70%),
+    linear-gradient(180deg, #101828, #0a0f1a);
+  transition: background .6s, filter .8s;
+  display: grid; grid-template-columns: 1.05fr 1fr; container-type: size;
+}
+.device.portrait .screen { grid-template-columns: 1fr; grid-template-rows: 1.1fr 1fr;
+  background:
+    radial-gradient(90% 50% at 50% 30%, color-mix(in srgb, var(--mood) 30%, transparent), transparent 70%),
+    linear-gradient(180deg, #101828, #0a0f1a); }
+.screen[data-mood="sleep"] { filter: brightness(.72); }
+.screen.night { filter: brightness(.55) saturate(.8); }
+
+.status-bar { position: absolute; top: 4%; left: 4%; right: 4%; display: flex; justify-content: space-between;
+  font-family: var(--display); font-weight: 600; font-size: clamp(10px, 3.2cqh, 15px); color: #c9d2e6; z-index: 3; pointer-events: none; }
+.status-bar .live::before { content: ""; display: inline-block; width: .6em; height: .6em; border-radius: 50%; background: var(--finished); margin-right: .4em; vertical-align: .05em; }
+.tally { font-variant-numeric: tabular-nums; opacity: .85; }
+
+.gogo-zone { position: relative; display: grid; place-items: center; min-height: 0; }
+#gogoBtn { background: none; border: 0; padding: 0; width: min(78%, 46cqw); max-height: 86%; aspect-ratio: 240 / 268; border-radius: 30%; }
+.device.portrait #gogoBtn { width: min(62%, 60cqw); }
+#gogoBtn svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.drift { width: 100%; height: 100%; display: grid; place-items: center; }
+
+.card-zone { position: relative; display: grid; align-content: center; gap: 3cqh; padding: 10% 8% 8% 2%; min-width: 0; }
+.device.portrait .card-zone { padding: 0 8% 12%; align-content: start; }
+.bubble {
+  background: #f6f8fd; color: #141a28; border-radius: 22px; padding: 5cqh 5cqh; position: relative;
+  box-shadow: 0 10px 30px -12px #000; min-width: 0;
+  animation: pop .45s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+.bubble::before { content: ""; position: absolute; left: -10px; top: 38%; border: 10px solid transparent; border-right-color: #f6f8fd; border-left: 0; }
+.device.portrait .bubble::before { left: 22%; top: -10px; border: 10px solid transparent; border-bottom-color: #f6f8fd; border-top: 0; }
+.bubble .tag { display: inline-flex; align-items: center; gap: .4em; font-family: var(--display); font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; font-size: clamp(9px, 3.4cqh, 13px); padding: .2em .7em; border-radius: 999px; background: color-mix(in srgb, var(--mood) 22%, white); color: color-mix(in srgb, var(--mood) 55%, black); }
+.bubble h3 { font-family: var(--display); font-weight: 700; margin: .35em 0 .15em; font-size: clamp(13px, 5.6cqh, 24px); line-height: 1.15; overflow-wrap: anywhere; }
+.bubble p { margin: 0; color: #4a5470; font-size: clamp(11px, 3.8cqh, 15px); line-height: 1.35; overflow-wrap: anywhere; }
+.bubble .meta { margin-top: .6em; font-size: clamp(10px, 3.2cqh, 13px); color: #7a84a0; font-weight: 700; }
+.minis { display: grid; gap: 1.6cqh; }
+.mini { display: flex; align-items: center; gap: .6em; background: #ffffff12; border: 1px solid #ffffff1c; border-radius: 14px; padding: 1.6cqh 2.4cqh;
+  font-weight: 700; font-size: clamp(10px, 3.6cqh, 14px); color: #dfe6f5; min-width: 0; }
+.mini span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mini i { flex: none; width: .7em; height: .7em; border-radius: 50%; background: var(--working); animation: pulse 1.2s ease-in-out infinite; }
+.mini i.done { background: var(--finished); animation: none; }
+.mini i.need { background: var(--needs); }
+
+@keyframes pop { from { transform: scale(.6) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
+
+/* zzz + effects layer */
+.fx { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+#confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+.z { position: absolute; font-family: var(--display); font-weight: 700; color: #b9c0ff; opacity: 0; animation: zz 3.6s ease-in infinite; }
+@keyframes zz { 0% { transform: translate(0,0) scale(.6); opacity: 0; } 20% { opacity: .9; } 100% { transform: translate(30px,-70px) scale(1.3); opacity: 0; } }
+.puff { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #9aa3b8; opacity: 0; animation: puff 2.4s ease-out infinite; }
+@keyframes puff { 0% { transform: translate(0,0) scale(.4); opacity: .7; } 100% { transform: translate(var(--dx, 10px), -60px) scale(1.8); opacity: 0; } }
+
+/* ---------- GoGo ---------- */
+.gg * { transform-box: fill-box; }
+.gg .whole { transform-origin: 50% 100%; animation: breathe 3.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: translateY(-3px) scaleY(1.012); } }
+.gg .dish { transform-origin: 50% 100%; transition: transform .3s; }
+.gg .dish-face { transform-origin: 50% 50%; }
+.gg .arm { transition: transform .4s cubic-bezier(.3, 1.5, .5, 1); }
+.gg .arm.l { transform-origin: 85% 12%; }
+.gg .arm.r { transform-origin: 15% 12%; }
+.gg .eye-set { display: none; }
+.gg .eyes-x { transition: transform .5s ease; }
+.gg .status-light { transition: fill .4s; }
+.gg .extra { display: none; }
+.gg .blinkable { transform-origin: 50% 50%; }
+.gg.blink .blinkable { transform: scaleY(.1); }
+
+/* eyes per mood */
+.gg[data-mood="sleep"] .eyes-sleep,
+.gg[data-mood="working"] .eyes-focus,
+.gg[data-mood="needs"] .eyes-wide,
+.gg[data-mood="finished"] .eyes-happy,
+.gg[data-mood="failed"] .eyes-dizzy,
+.gg[data-mood="recording"] .eyes-calm,
+.gg.boop .eyes-happy { display: block; }
+.gg.boop .eye-set:not(.eyes-happy) { display: none; }
+
+/* sleep */
+.gg[data-mood="sleep"] .whole { animation: snooze 4.8s ease-in-out infinite; }
+@keyframes snooze { 50% { transform: translateY(2px) scaleY(.985) rotate(-1.5deg); } }
+.gg[data-mood="sleep"] .dish { transform: rotate(-28deg); }
+.gg[data-mood="sleep"] .arm.l { transform: rotate(8deg); }
+.gg[data-mood="sleep"] .arm.r { transform: rotate(-8deg); }
+.night .gg .nightcap { display: block; }
+
+/* working */
+.gg[data-mood="working"] .dish-face { animation: scan 1.4s ease-in-out infinite; }
+@keyframes scan { 0%,100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
+.gg[data-mood="working"] .eyes-x { animation: look 3.2s ease-in-out infinite; }
+@keyframes look { 0%, 30% { transform: translateX(-5px); } 50%, 80% { transform: translateX(5px); } }
+.gg[data-mood="working"] .arm.l { animation: type 0.36s ease-in-out infinite alternate; }
+.gg[data-mood="working"] .arm.r { animation: type 0.36s ease-in-out infinite alternate-reverse; }
+@keyframes type { from { transform: rotate(-12deg); } to { transform: rotate(-2deg); } }
+.gg[data-mood="working"] .laptop { display: block; }
+.gg .orbit { display: none; transform-origin: 50% 50%; }
+.gg[data-mood="working"] .orbit { display: block; animation: spin 6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* needs you */
+.gg[data-mood="needs"] .whole { animation: hop .9s cubic-bezier(.3, .0, .3, 1) infinite; }
+@keyframes hop { 0%, 100% { transform: translateY(0) scale(1.04, .96); } 40% { transform: translateY(-16px) scale(.97, 1.04); } 70% { transform: translateY(0) scale(1.03, .97); } }
+.gg[data-mood="needs"] .arm.r { transform: rotate(-150deg); }
+.gg[data-mood="needs"] .arm.l { animation: wave .5s ease-in-out infinite alternate; }
+@keyframes wave { from { transform: rotate(130deg); } to { transform: rotate(165deg); } }
+.gg[data-mood="needs"] .sign, .gg[data-mood="needs"] .alert-mark { display: block; }
+.gg[data-mood="needs"] .dish { transform: rotate(0); }
+.gg[data-mood="needs"] .dish-face { animation: scan .5s linear infinite; }
+
+/* finished */
+.gg[data-mood="finished"] .whole { animation: bounce 1.2s ease-in-out infinite; }
+@keyframes bounce { 50% { transform: translateY(-8px) rotate(2deg); } }
+.gg[data-mood="finished"] .arm.l { transform: rotate(140deg); }
+.gg[data-mood="finished"] .arm.r { transform: rotate(-140deg); }
+.gg[data-mood="finished"] .sparkle { display: block; }
+.gg[data-mood="finished"] .cheek { opacity: .75; }
+
+/* failed */
+.gg[data-mood="failed"] .whole { animation: wobble 1.6s ease-in-out infinite; }
+@keyframes wobble { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+.gg[data-mood="failed"] .eyes-dizzy .spiral { animation: spin 1.2s linear infinite; transform-origin: 50% 50%; }
+.gg[data-mood="failed"] .dish { transform: rotate(38deg) translateY(2px); }
+.gg[data-mood="failed"] .arm.l { transform: rotate(-20deg); }
+.gg[data-mood="failed"] .arm.r { transform: rotate(20deg); }
+.gg[data-mood="failed"] .bandage { display: block; }
+
+/* recording */
+.gg[data-mood="recording"] .headphones, .gg[data-mood="recording"] .shh { display: block; }
+.gg[data-mood="recording"] .arm.r { transform: rotate(-118deg); }
+.gg[data-mood="recording"] .whole { animation: sway 3s ease-in-out infinite; }
+@keyframes sway { 50% { transform: rotate(2deg); } }
+
+/* tap */
+.gg.boop .whole { animation: squish .5s cubic-bezier(.3, 1.6, .5, 1) 1 !important; }
+@keyframes squish { 0% { transform: scale(1); } 30% { transform: scale(1.12, .86); } 60% { transform: scale(.94, 1.08); } 100% { transform: scale(1); } }
+
+/* burn-in drift while asleep */
+.screen[data-mood="sleep"] .drift { animation: drift 60s ease-in-out infinite; }
+@keyframes drift { 25% { transform: translate(6%, -4%); } 50% { transform: translate(-4%, 3%); } 75% { transform: translate(3%, 5%); } }
+
+/* ---------- Controls ---------- */
+.controls { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.box h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 17px; letter-spacing: .2px; }
+.moods { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.mood { text-align: left; background: #0f1524; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; }
+.mood b { font-family: var(--display); font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.mood b::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+.mood small { color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.mood[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, #0f1524); }
+.notes { margin: 0; padding-left: 1.1em; color: var(--muted); display: grid; gap: 6px; font-size: 14px; }
+.notes b { color: var(--text); }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+
+@media (max-width: 560px) {
+  .device { border-radius: 22px; padding: 7px; }
+  .screen { border-radius: 16px; }
+  .bubble::before { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gg *, .gg .whole, .screen .drift, .z, .puff, .mini i, .bubble { animation: none !important; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Meet <span>GoGo</span></h1>
+      <p>Your Claude Radar desk companion. Pick a mood to see how GoGo reacts to your chats, tap GoGo to say hi, and turn sound on to hear the chirps.</p>
+    </div>
+    <div class="toolbar">
+      <button class="pill" id="soundBtn" aria-pressed="false">🔈 Sound off</button>
+      <button class="pill" id="demoBtn" aria-pressed="false">▶ Play demo</button>
+      <button class="pill" id="orientBtn">↻ Portrait</button>
+      <button class="pill" id="nightBtn" aria-pressed="false">☾ Night</button>
+    </div>
+  </header>
+
+  <div class="device landscape" id="device">
+    <div class="screen" id="screen" data-mood="working">
+      <div class="status-bar"><span class="live">Live</span><span class="tally" id="tally">Today · 7 finished · 2 needed you</span></div>
+      <div class="gogo-zone">
+        <div class="drift">
+          <button id="gogoBtn" aria-label="Tap GoGo">
+            <svg viewBox="0 0 240 268" class="gg" id="gogo" data-mood="working" aria-hidden="true">
+              <defs>
+                <linearGradient id="shell" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#f7f9fd"/><stop offset="1" stop-color="#cdd6e7"/>
+                </linearGradient>
+                <radialGradient id="visorGlow" cx=".5" cy=".35" r=".8">
+                  <stop offset="0" stop-color="#1d2740"/><stop offset="1" stop-color="#0e131f"/>
+                </radialGradient>
+              </defs>
+
+              <!-- orbiting chat dots (working) -->
+              <g class="orbit">
+                <circle cx="120" cy="138" r="112" fill="none" stroke="#5aa8ff" stroke-opacity=".18" stroke-dasharray="3 9"/>
+                <circle cx="232" cy="138" r="7" fill="#5aa8ff"/>
+                <circle cx="8" cy="138" r="7" fill="#5aa8ff"/>
+                <circle cx="120" cy="26" r="7" fill="#5aa8ff"/>
+              </g>
+
+              <g class="whole">
+                <!-- shadow -->
+                <ellipse cx="120" cy="258" rx="62" ry="7" fill="#000" opacity=".35"/>
+
+                <!-- antenna + radar dish -->
+                <g class="dish">
+                  <rect x="117" y="38" width="6" height="30" rx="3" fill="#9fb0cc"/>
+                  <g class="dish-face">
+                    <path d="M92 30 Q120 58 148 30 Q120 40 92 30 Z" fill="#e8edf6" stroke="#a9b6cf" stroke-width="2"/>
+                    <circle cx="120" cy="26" r="6" fill="var(--mood)"/>
+                    <circle cx="120" cy="26" r="11" fill="var(--mood)" opacity=".25"/>
+                  </g>
+                </g>
+
+                <!-- night cap -->
+                <g class="extra nightcap">
+                  <path d="M70 84 Q96 22 168 40 Q150 60 170 84 Z" fill="#6b74e8"/>
+                  <path d="M66 84 Q120 70 174 84 L172 94 Q120 82 68 94 Z" fill="#f2f4ff"/>
+                  <circle cx="172" cy="38" r="10" fill="#f2f4ff"/>
+                </g>
+
+                <!-- arms (behind body) -->
+                <g class="arm l"><rect x="34" y="150" width="30" height="62" rx="15" fill="url(#shell)" stroke="#b6c2d8" stroke-width="2"/></g>
+                <g class="arm r"><rect x="176" y="150" width="30" height="62" rx="15" fill="url(#shell)" stroke="#b6c2d8" stroke-width="2"/></g>
+
+                <!-- feet -->
+                <rect x="78" y="236" width="34" height="20" rx="10" fill="#aebcd3"/>
+                <rect x="128" y="236" width="34" height="20" rx="10" fill="#aebcd3"/>
+
+                <!-- body -->
+                <rect x="52" y="62" width="136" height="184" rx="64" fill="url(#shell)" stroke="#b6c2d8" stroke-width="2"/>
+                <ellipse cx="96" cy="96" rx="22" ry="10" fill="#fff" opacity=".55"/>
+
+                <!-- face screen -->
+                <rect x="68" y="88" width="104" height="76" rx="30" fill="url(#visorGlow)"/>
+                <rect x="68" y="88" width="104" height="76" rx="30" fill="none" stroke="var(--mood)" stroke-opacity=".35" stroke-width="2"/>
+
+                <g class="eyes-x">
+                  <!-- sleep: closed arcs -->
+                  <g class="eye-set eyes-sleep" fill="none" stroke="#b9c0ff" stroke-width="5" stroke-linecap="round">
+                    <path d="M90 126 q10 7 20 0"/><path d="M130 126 q10 7 20 0"/>
+                  </g>
+                  <!-- focus: narrowed bars -->
+                  <g class="eye-set eyes-focus" fill="var(--working)">
+                    <rect class="blinkable" x="88" y="116" width="22" height="13" rx="6.5"/>
+                    <rect class="blinkable" x="130" y="116" width="22" height="13" rx="6.5"/>
+                  </g>
+                  <!-- wide: big round eyes -->
+                  <g class="eye-set eyes-wide">
+                    <circle class="blinkable" cx="99" cy="122" r="13" fill="var(--needs)"/>
+                    <circle class="blinkable" cx="141" cy="122" r="13" fill="var(--needs)"/>
+                    <circle cx="104" cy="117" r="4" fill="#fff"/><circle cx="146" cy="117" r="4" fill="#fff"/>
+                  </g>
+                  <!-- happy: ^ ^ -->
+                  <g class="eye-set eyes-happy" fill="none" stroke="var(--finished)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M88 128 l11 -12 l11 12"/><path d="M130 128 l11 -12 l11 12"/>
+                  </g>
+                  <!-- dizzy: spirals -->
+                  <g class="eye-set eyes-dizzy" fill="none" stroke="var(--failed)" stroke-width="4" stroke-linecap="round">
+                    <path class="spiral" d="M99 122 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0 a11 11 0 1 1 -22 0"/>
+                    <path class="spiral" d="M141 122 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0 a11 11 0 1 1 -22 0"/>
+                  </g>
+                  <!-- calm: content closed eyes (recording) -->
+                  <g class="eye-set eyes-calm" fill="none" stroke="var(--rec)" stroke-width="5" stroke-linecap="round">
+                    <path d="M90 124 q10 -8 20 0"/><path d="M130 124 q10 -8 20 0"/>
+                  </g>
+                </g>
+
+                <!-- cheeks -->
+                <ellipse class="cheek" cx="84" cy="146" rx="9" ry="5" fill="#ff8fb0" opacity=".45"/>
+                <ellipse class="cheek" cx="156" cy="146" rx="9" ry="5" fill="#ff8fb0" opacity=".45"/>
+
+                <!-- status light on the tummy -->
+                <circle class="status-light" cx="120" cy="196" r="9" fill="var(--mood)"/>
+                <circle cx="120" cy="196" r="16" fill="var(--mood)" opacity=".18"/>
+
+                <!-- laptop (working) -->
+                <g class="extra laptop">
+                  <path d="M74 214 L166 214 L176 234 L64 234 Z" fill="#2a3552"/>
+                  <rect x="80" y="178" width="80" height="38" rx="5" fill="#33405f"/>
+                  <circle cx="120" cy="197" r="4" fill="#9fb0cc"/>
+                </g>
+
+                <!-- sign (needs you) -->
+                <g class="extra sign">
+                  <rect x="150" y="6" width="84" height="52" rx="12" fill="#fff4dc" stroke="var(--needs)" stroke-width="4"/>
+                  <text x="192" y="40" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="22" fill="#8a5a00">HEY!</text>
+                  <rect x="186" y="56" width="6" height="40" rx="3" fill="#c79a4a"/>
+                </g>
+                <g class="extra alert-mark">
+                  <text x="40" y="70" font-family="Fredoka, sans-serif" font-weight="700" font-size="34" fill="var(--needs)">!</text>
+                </g>
+
+                <!-- sparkles (finished) -->
+                <g class="extra sparkle" fill="var(--finished)">
+                  <path d="M30 70 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 l10 -4 Z"/>
+                  <path d="M206 58 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 l8 -3 Z"/>
+                  <path d="M214 150 l3 7 l7 3 l-7 3 l-3 7 l-3 -7 l-7 -3 l7 -3 Z" opacity=".7"/>
+                </g>
+
+                <!-- bandage (failed) -->
+                <g class="extra bandage">
+                  <path d="M132 76 L170 64 Q175 63 176 68 L178 74 Q179 79 174 80 L136 92 Q131 93 130 88 L128 82 Q127 77 132 76 Z" fill="#ffd2a8"/>
+                  <circle cx="150" cy="77" r="1.8" fill="#c08a5c"/><circle cx="158" cy="75" r="1.8" fill="#c08a5c"/>
+                </g>
+
+                <!-- headphones + shh (recording) -->
+                <g class="extra headphones">
+                  <path d="M50 120 Q50 40 120 40 Q190 40 190 120" fill="none" stroke="#2c3550" stroke-width="10" stroke-linecap="round"/>
+                  <rect x="36" y="104" width="24" height="44" rx="10" fill="var(--rec)"/>
+                  <rect x="180" y="104" width="24" height="44" rx="10" fill="var(--rec)"/>
+                </g>
+                <g class="extra shh">
+                  <circle cx="120" cy="152" r="6" fill="#ff8fb0"/>
+                  <text x="196" y="186" font-family="Fredoka, sans-serif" font-weight="700" font-size="18" fill="var(--rec)">shh</text>
+                </g>
+              </g>
+            </svg>
+          </button>
+        </div>
+        <div class="fx" id="fx"></div>
+      </div>
+      <div class="card-zone" id="cards"></div>
+      <canvas id="confetti"></canvas>
+    </div>
+  </div>
+
+  <section class="controls">
+    <div class="box">
+      <h2>Moods</h2>
+      <div class="moods" id="moods">
+        <button class="mood" data-m="sleep" style="--c: var(--sleep)"><b>Sleeping</b><small>Nothing running. Dims and drifts to protect the screen.</small></button>
+        <button class="mood" data-m="working" style="--c: var(--working)"><b>Working</b><small>Claude is busy. One orbiting dot per chat.</small></button>
+        <button class="mood" data-m="needs" style="--c: var(--needs)"><b>Needs you</b><small>Hops and waves a sign until you look.</small></button>
+        <button class="mood" data-m="finished" style="--c: var(--finished)"><b>Finished</b><small>Celebrates and shows Claude's last line.</small></button>
+        <button class="mood" data-m="failed" style="--c: var(--failed)"><b>Failed</b><small>Gets dizzy when a chat hits an error.</small></button>
+        <button class="mood" data-m="recording" style="--c: var(--rec)"><b>Recording</b><small>Headphones on. No sound or vibration.</small></button>
+      </div>
+      <p class="hint">Tap GoGo on the screen for a boop.</p>
+    </div>
+    <div class="box">
+      <h2>How it works on the phone</h2>
+      <ul class="notes">
+        <li><b>Landscape on a stand:</b> GoGo on the left, the newest chat card on the right.</li>
+        <li><b>Swipe up</b> for every chat as cards. Tap one to mark it seen or open it.</li>
+        <li><b>Chirps</b> are short tones made by the app, so there's nothing to license. Recording mode mutes them.</li>
+        <li><b>Night</b> puts on a sleeping cap and dims the screen.</li>
+        <li>Notifications, the live connection and Alert check work the same as now.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const root = document.documentElement;
+  const screen = document.getElementById('screen');
+  const gogo = document.getElementById('gogo');
+  const cards = document.getElementById('cards');
+  const fx = document.getElementById('fx');
+  const device = document.getElementById('device');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const colors = { sleep: '--sleep', working: '--working', needs: '--needs', finished: '--finished', failed: '--failed', recording: '--rec' };
+
+  // Example chats (sample data, not your real chats)
+  const content = {
+    sleep: () => `<div class="minis"><div class="mini"><i class="done"></i><span>All quiet. GoGo is napping.</span></div>
+      <div class="mini"><i class="done"></i><span>Last: Teaser cutsheet EP42 · 25 min ago</span></div></div>`,
+    working: () => `<div class="minis">
+      <div class="mini"><i></i><span>Session intake 21.11–22.11 · Cloud</span></div>
+      <div class="mini"><i></i><span>Alice Lovell reel v6 · Mac Mini</span></div>
+      <div class="mini"><i></i><span>Monday board update · GHANEM-JR</span></div></div>`,
+    needs: () => bubble('Needs you', 'Session intake 21.11–22.11', 'Claude needs your permission to move Stereo-Mix.mp3 into P#3.', 'Cloud · just now'),
+    finished: () => bubble('Finished', 'Teaser cutsheet EP42', '6 clips, 58 seconds total. Saved to EP42/teaser.xlsx.', 'Mac Mini · just now'),
+    failed: () => bubble('Failed', 'Subtitle translation EP43', 'Rate limit reached. Try again in a few minutes.', 'Cloud · 1 min ago'),
+    recording: () => `<div class="minis"><div class="mini"><i class="need"></i><span>Recording mode · 2 alerts waiting</span></div>
+      <div class="mini"><i></i><span>Alerts play when you stop recording</span></div></div>`,
+  };
+  function bubble(tag, title, msg, meta) {
+    return `<div class="bubble"><span class="tag">● ${tag}</span><h3>${title}</h3><p>${msg}</p><div class="meta">${meta} · tap to open</div></div>`;
+  }
+
+  // ---------- sound (WebAudio chirps) ----------
+  let ctx = null, soundOn = false;
+  function tone(freqs, { type = 'sine', dur = .09, gap = .02, vol = .18, slide = 1.25 } = {}) {
+    if (!soundOn) return;
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    let t = ctx.currentTime + .01;
+    freqs.forEach(f => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * slide, t + dur);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + dur + .02); t += dur + gap;
+    });
+  }
+  const chirps = {
+    boop: () => tone([620], { dur: .1, slide: 1.6, type: 'sine' }),
+    working: () => tone([520, 700], { dur: .06, vol: .08, slide: 1.1 }),
+    needs: () => { tone([880, 1320, 880, 1320], { type: 'triangle', dur: .08, gap: .05, slide: 1.15 }); },
+    finished: () => tone([784, 988, 1175, 1568], { type: 'triangle', dur: .09, gap: .015, slide: 1.02 }),
+    failed: () => tone([520, 390, 260], { type: 'square', dur: .14, vol: .06, slide: .8 }),
+    sleep: () => tone([330, 294], { dur: .22, vol: .07, slide: .95 }),
+    recording: () => {},
+  };
+
+  // ---------- confetti ----------
+  const cv = document.getElementById('confetti'), c2 = cv.getContext('2d');
+  let parts = [], raf = 0;
+  function confetti() {
+    if (reduce) return;
+    const r = cv.getBoundingClientRect(); cv.width = r.width * devicePixelRatio; cv.height = r.height * devicePixelRatio;
+    const pal = ['#3ee0a0', '#ffb21e', '#5aa8ff', '#ff6fa8', '#ffffff'];
+    const ox = cv.width * (device.classList.contains('portrait') ? .5 : .27), oy = cv.height * .35;
+    parts = Array.from({ length: 90 }, () => ({
+      x: ox, y: oy, vx: (Math.random() - .5) * 9 * devicePixelRatio, vy: (-Math.random() * 9 - 3) * devicePixelRatio,
+      s: (3 + Math.random() * 4) * devicePixelRatio, r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: pal[(Math.random() * pal.length) | 0], life: 1,
+    }));
+    cancelAnimationFrame(raf); step();
+  }
+  function step() {
+    c2.clearRect(0, 0, cv.width, cv.height);
+    parts.forEach(p => { p.vy += .25 * devicePixelRatio; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= .008;
+      c2.save(); c2.globalAlpha = Math.max(p.life, 0); c2.translate(p.x, p.y); c2.rotate(p.r); c2.fillStyle = p.c; c2.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); c2.restore(); });
+    parts = parts.filter(p => p.life > 0 && p.y < cv.height + 20);
+    if (parts.length) raf = requestAnimationFrame(step); else c2.clearRect(0, 0, cv.width, cv.height);
+  }
+
+  // ---------- moods ----------
+  let mood = 'working';
+  function setMood(m, { quiet = false } = {}) {
+    mood = m;
+    gogo.dataset.mood = m; screen.dataset.mood = m;
+    root.style.setProperty('--mood', `var(${colors[m]})`);
+    cards.innerHTML = content[m]();
+    document.querySelectorAll('.mood').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === m));
+    fx.innerHTML = '';
+    cancelAnimationFrame(raf); parts = []; c2.clearRect(0, 0, cv.width, cv.height);
+    if (m === 'sleep') addZ();
+    if (m === 'failed') addPuffs();
+    if (m === 'finished') confetti();
+    if (!quiet) chirps[m]();
+  }
+  function addZ() {
+    if (reduce) return;
+    [0, 1.2, 2.4].forEach((d, i) => {
+      const z = document.createElement('span'); z.className = 'z'; z.textContent = 'z';
+      z.style.cssText = `left:${58 + i * 4}%;top:${30 - i * 3}%;font-size:${16 + i * 6}px;animation-delay:${d}s`;
+      fx.appendChild(z);
+    });
+  }
+  function addPuffs() {
+    if (reduce) return;
+    [0, .8, 1.6].forEach((d, i) => {
+      const p = document.createElement('span'); p.className = 'puff';
+      p.style.cssText = `left:${44 + i * 6}%;top:22%;animation-delay:${d}s;--dx:${(i - 1) * 16}px`;
+      fx.appendChild(p);
+    });
+  }
+
+  // ---------- life: blinking, boop ----------
+  setInterval(() => {
+    if (['working', 'needs'].includes(mood) && !reduce) { gogo.classList.add('blink'); setTimeout(() => gogo.classList.remove('blink'), 140); }
+  }, 2600);
+  document.getElementById('gogoBtn').addEventListener('click', () => {
+    gogo.classList.remove('boop'); void gogo.getBBox(); gogo.classList.add('boop');
+    chirps.boop(); setTimeout(() => gogo.classList.remove('boop'), 900);
+  });
+
+  // ---------- controls ----------
+  document.getElementById('moods').addEventListener('click', e => {
+    const b = e.target.closest('.mood'); if (!b) return; stopDemo(); setMood(b.dataset.m);
+  });
+  const soundBtn = document.getElementById('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn; soundBtn.setAttribute('aria-pressed', soundOn);
+    soundBtn.textContent = soundOn ? '🔊 Sound on' : '🔈 Sound off';
+    if (soundOn) { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume?.(); chirps[mood](); }
+  });
+  const orientBtn = document.getElementById('orientBtn');
+  orientBtn.addEventListener('click', () => {
+    const p = device.classList.toggle('portrait'); device.classList.toggle('landscape', !p);
+    orientBtn.textContent = p ? '↻ Landscape' : '↻ Portrait';
+  });
+  const nightBtn = document.getElementById('nightBtn');
+  nightBtn.addEventListener('click', () => {
+    const on = screen.classList.toggle('night'); nightBtn.setAttribute('aria-pressed', on);
+    gogo.closest('.screen').classList.toggle('night', on);
+    if (on) { stopDemo(); setMood('sleep'); }
+  });
+
+  // demo: a day in the studio
+  const demoSeq = ['sleep', 'working', 'needs', 'working', 'finished', 'recording', 'failed', 'sleep'];
+  let demoTimer = 0, demoI = 0;
+  const demoBtn = document.getElementById('demoBtn');
+  function stopDemo() { clearInterval(demoTimer); demoTimer = 0; demoBtn.setAttribute('aria-pressed', 'false'); demoBtn.textContent = '▶ Play demo'; }
+  demoBtn.addEventListener('click', () => {
+    if (demoTimer) return stopDemo();
+    demoBtn.setAttribute('aria-pressed', 'true'); demoBtn.textContent = '■ Stop demo';
+    demoI = 0; setMood(demoSeq[demoI]);
+    demoTimer = setInterval(() => { demoI = (demoI + 1) % demoSeq.length; setMood(demoSeq[demoI]); }, 3800);
+  });
+
+  setMood('working', { quiet: true });
+})();
+</script>
