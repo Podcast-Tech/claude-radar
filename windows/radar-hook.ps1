@@ -74,6 +74,7 @@ try {
         message    = $message
         at         = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     }
+    if ($HookEvent -eq "SessionEnd" -and $in.reason) { $body["reason"] = [string]$in.reason }
 
     if ($status -eq "ended") { Remove-Item $stateFile -ErrorAction SilentlyContinue }
     else {

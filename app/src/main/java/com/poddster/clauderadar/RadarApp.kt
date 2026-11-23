@@ -33,6 +33,9 @@ object Prefs {
     fun setRecording(ctx: Context, v: Boolean) = p(ctx).edit().putBoolean("recording", v).apply()
     fun keepScreenOn(ctx: Context) = p(ctx).getBoolean("keep_screen_on", true)
     fun setKeepScreenOn(ctx: Context, v: Boolean) = p(ctx).edit().putBoolean("keep_screen_on", v).apply()
+    /** Minutes after which an unseen "finished" result clears itself (0 = never). */
+    fun autoRestMinutes(ctx: Context) = p(ctx).getInt("auto_rest_min", 10)
+    fun setAutoRestMinutes(ctx: Context, v: Int) = p(ctx).edit().putInt("auto_rest_min", v).apply()
 }
 
 class RadarApp : Application() {

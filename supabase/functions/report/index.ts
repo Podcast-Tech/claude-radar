@@ -69,8 +69,15 @@ Deno.serve(async (req) => {
   if (existing && new Date(existing.updated_at).getTime() > sentAt) {
     return json({ ok: true, ignored: "older than current status" });
   }
-  // A session closing should not hide a result you haven't looked at yet.
+  // A session closing should not hide a result you haven't looked at yet...
   if (status === "ended" && existing && existing.status !== "working") {
+    // ...unless you closed it yourself (/exit, /clear, logout): then you've seen it.
+    const reason = String(body.reason ?? "");
+    if (["prompt_input_exit", "clear", "logout"].includes(reason) && existing.status === "finished") {
+      await admin.from("radar_sessions").update({ seen_at: new Date().toISOString() })
+        .eq("owner", tok.owner).eq("session_id", sessionId);
+      return json({ ok: true, seen: true });
+    }
     return json({ ok: true, kept: existing.status });
   }
 

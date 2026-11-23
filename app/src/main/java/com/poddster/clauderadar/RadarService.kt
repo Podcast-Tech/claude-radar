@@ -58,6 +58,20 @@ class RadarService : Service() {
                 list.filter { !it.alerting }.forEach { nm.cancel(it.sessionId.hashCode()) }
             }
         }
+        // Finished results clear themselves after the chosen time, so GoGo goes back to rest.
+        scope.launch {
+            while (true) {
+                delay(30_000)
+                val mins = Prefs.autoRestMinutes(this@RadarService)
+                if (mins > 0) {
+                    val cutoff = java.time.Instant.now().minusSeconds(mins * 60L)
+                    RadarStore.sessions.value
+                        .filter { it.unseen && it.status == "finished" }
+                        .filter { runCatching { java.time.OffsetDateTime.parse(it.updatedAt).toInstant().isBefore(cutoff) }.getOrDefault(false) }
+                        .forEach { RadarStore.markSeen(it.sessionId) }
+                }
+            }
+        }
         scope.launch {
             while (true) {
                 runCatching { Updater.check() }.getOrNull()?.let { notifyUpdate(it) }

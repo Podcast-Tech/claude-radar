@@ -101,6 +101,7 @@ eval {
         machine    => $machine,
         message    => $message,
         at         => int(time() * 1000),
+        reason     => ($event eq 'SessionEnd' ? $in->{reason} : undef),
     );
     delete $body{$_} for grep { !defined $body{$_} } keys %body;
 

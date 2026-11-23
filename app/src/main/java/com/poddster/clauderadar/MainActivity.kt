@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
 import android.webkit.WebView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.widthIn
@@ -99,6 +100,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= 33) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         applyKeepScreenOn()
+        openFromNotification(intent)
         setContent {
             MaterialTheme(colorScheme = darkColorScheme(primary = Blue)) {
                 val status by Supa.client.auth.sessionStatus.collectAsState()
@@ -112,6 +114,25 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openFromNotification(intent)
+    }
+
+    /** A tapped alert: clear it from GoGo and open that chat (cloud chats open in the Claude app). */
+    private fun openFromNotification(intent: Intent?) {
+        val id = intent?.getStringExtra(EXTRA_OPEN_SESSION) ?: return
+        val url = intent.getStringExtra(EXTRA_OPEN_URL)
+        intent.removeExtra(EXTRA_OPEN_SESSION)
+        if (id != "local-test") lifecycleScope.launch { RadarStore.markSeen(id) }
+        url?.let { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) } }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_SESSION = "open_session"
+        const val EXTRA_OPEN_URL = "open_url"
     }
 
     fun applyKeepScreenOn() {
@@ -184,6 +205,7 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
     val connected by RadarStore.connected.collectAsState()
     var recording by remember { mutableStateOf(Prefs.recording(ctx)) }
     var keepOn by remember { mutableStateOf(Prefs.keepScreenOn(ctx)) }
+    var restMins by remember { mutableStateOf(Prefs.autoRestMinutes(ctx)) }
     var menu by remember { mutableStateOf(false) }
     var update by remember { mutableStateOf<Updater.Release?>(null) }
     var updateProgress by remember { mutableStateOf<Float?>(null) }
@@ -295,6 +317,13 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                 DropdownMenu(menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Test alert") }, onClick = { menu = false; Alerter.test(ctx) })
                     DropdownMenuItem(text = { Text("Alert check") }, onClick = { menu = false; showChecks = true })
+                    DropdownMenuItem(
+                        text = { Text("GoGo rests after: " + if (restMins == 0) "never" else "$restMins min") },
+                        onClick = {
+                            val next = listOf(5, 10, 30, 0).let { it[(it.indexOf(restMins) + 1) % it.size] }
+                            restMins = next; Prefs.setAutoRestMinutes(ctx, next)
+                        },
+                    )
                     DropdownMenuItem(text = { Text("Mark all as seen") }, onClick = { menu = false; scope.launch { RadarStore.markAllSeen() } })
                     DropdownMenuItem(text = { Text("Clear seen results") }, onClick = { menu = false; scope.launch { RadarStore.clearDone() } })
                     DropdownMenuItem(

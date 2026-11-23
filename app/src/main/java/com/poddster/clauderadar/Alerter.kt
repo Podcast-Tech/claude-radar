@@ -42,7 +42,9 @@ object Alerter {
         }
         val open = PendingIntent.getActivity(
             ctx, s.sessionId.hashCode(),
-            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(MainActivity.EXTRA_OPEN_SESSION, s.sessionId)
+                .putExtra(MainActivity.EXTRA_OPEN_URL, s.url),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val n = NotificationCompat.Builder(ctx, channel)
