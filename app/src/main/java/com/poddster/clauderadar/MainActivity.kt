@@ -196,6 +196,10 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
     // GoGo lives in a WebView (assets/gogo/index.html); the app feeds it the chats.
     var web by remember { mutableStateOf<WebView?>(null) }
     var webReady by remember { mutableStateOf(false) }
+    var webError by remember { mutableStateOf<String?>(null) }
+    var showWebHelp by remember { mutableStateOf(false) }
+    val webViewVersion = remember { webViewVersion() }
+    LaunchedEffect(Unit) { delay(6_000); if (!webReady) showWebHelp = true }
     val payload = remember(sessions, connected, recording) {
         GoGoJson.encodeToString(GoGoState(sessions, connected, recording))
     }
@@ -218,6 +222,14 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                     isVerticalScrollBarEnabled = false
                     isHorizontalScrollBarEnabled = false
                     overScrollMode = android.view.View.OVER_SCROLL_NEVER
+                    webChromeClient = object : android.webkit.WebChromeClient() {
+                        override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
+                            if (m.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR) {
+                                webError = "${m.message()} (line ${m.lineNumber()})"
+                            }
+                            return true
+                        }
+                    }
                     addJavascriptInterface(
                         GoGoBridge(
                             onTap = { id ->
@@ -227,7 +239,7 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                             },
                             onRemove = { id -> scope.launch { RadarStore.remove(id) } },
                             onBoop = { if (!Prefs.recording(ctx)) Chirps.play("boop") },
-                            onReady = { webReady = true },
+                            onReady = { webReady = true; showWebHelp = false },
                         ),
                         "Android",
                     )
@@ -236,6 +248,34 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                 }
             },
         )
+
+        if (showWebHelp) {
+            Column(
+                Modifier.align(Alignment.Center).padding(24.dp).widthIn(max = 460.dp)
+                    .background(Color(0xFF161D2E), RoundedCornerShape(20.dp)).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("GoGo couldn't load", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "GoGo is drawn by Android System WebView, which is updated separately in the Play Store. " +
+                        "This phone has version $webViewVersion. Update it, then reopen Claude Radar.",
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+                webError?.let { Text("Error: $it", color = Grey, fontSize = 12.sp) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        runCatching {
+                            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.webview"))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }.onFailure {
+                            ctx.startActivity(Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.webview")))
+                        }
+                    }) { Text("Update WebView") }
+                    OutlinedButton(onClick = { showWebHelp = false }) { Text("Hide") }
+                }
+            }
+        }
 
         Row(
             Modifier.align(Alignment.TopEnd).systemBarsPadding().padding(top = 2.dp, end = 2.dp),
@@ -275,7 +315,7 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
                         menu = false
                         scope.launch { RadarService.stop(ctx); RadarStore.stop(); Supa.client.auth.signOut() }
                     })
-                    DropdownMenuItem(text = { Text("Version ${BuildConfig.VERSION_NAME}", color = Grey) }, onClick = { menu = false })
+                    DropdownMenuItem(text = { Text("Version ${BuildConfig.VERSION_NAME} · WebView $webViewVersion", color = Grey) }, onClick = { menu = false })
                 }
             }
         }
@@ -392,3 +432,7 @@ private fun SessionRow(s: RadarSession, now: Instant, modifier: Modifier) {
         }
     }
 }
+
+/** Version of the Android System WebView that draws GoGo (e.g. "83.0.4103.106"). */
+private fun webViewVersion(): String =
+    runCatching { WebView.getCurrentWebViewPackage()?.versionName }.getOrNull() ?: "unknown"

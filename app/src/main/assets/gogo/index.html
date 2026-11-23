@@ -17,7 +17,7 @@
 html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-family: var(--body); overflow: hidden; user-select: none; -webkit-user-select: none; }
 
 .screen {
-  position: fixed; inset: 0; display: grid; grid-template-columns: 1.05fr 1fr;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: 1.05fr 1fr;
   background: radial-gradient(60% 80% at 28% 55%, var(--glow), transparent 70%), linear-gradient(180deg, #101828, #0a0f1a);
   transition: filter .8s;
 }
@@ -39,8 +39,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 .portrait .topbar .tally { margin-left: 0; flex-basis: 100%; font-size: 13px; }
 
 .gogo-zone { position: relative; display: grid; place-items: center; min-height: 0; padding-top: 30px; }
-#gogoBtn { background: none; border: 0; padding: 0; width: min(74%, 44vw, 78vh); aspect-ratio: 240 / 268; cursor: pointer; }
-.portrait #gogoBtn { width: min(64%, 46vh); }
+#gogoBtn { background: none; border: 0; padding: 0; width: 40vmin; height: 44.7vmin; cursor: pointer; } /* sized by sizeGoGo() */
 #gogoBtn svg { width: 100%; height: 100%; overflow: visible; display: block; }
 .drift { width: 100%; height: 100%; display: grid; place-items: center; }
 
@@ -52,9 +51,9 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 .portrait .bubble::before { left: 24%; top: -10px; border: 10px solid transparent; border-bottom-color: #f6f8fd; border-top: 0; }
 .bubble .tag { display: inline-block; font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 12px;
   padding: 3px 10px; border-radius: 999px; background: var(--tagbg); color: var(--tagfg); }
-.bubble h3 { font-family: var(--display); font-weight: 700; margin: 8px 0 4px; font-size: clamp(17px, 3.4vmin + 6px, 26px); line-height: 1.15; overflow-wrap: anywhere;
+.bubble h3 { font-family: var(--display); font-weight: 700; margin: 8px 0 4px; font-size: 19px; font-size: clamp(17px, 3.4vmin + 6px, 26px); line-height: 1.15; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.bubble p { margin: 0; color: #4a5470; font-size: clamp(13px, 1.6vmin + 8px, 17px); line-height: 1.35; overflow-wrap: anywhere;
+.bubble p { margin: 0; color: #4a5470; font-size: 15px; font-size: clamp(13px, 1.6vmin + 8px, 17px); line-height: 1.35; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .bubble .meta { margin-top: 8px; font-size: 13px; color: #7a84a0; font-weight: 800; }
 .more { justify-self: start; font-weight: 800; font-size: 13px; color: #dfe6f5; background: #ffffff14; border: 1px solid #ffffff22; border-radius: 999px; padding: 5px 12px; }
@@ -66,13 +65,13 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 .mini i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--working); animation: pulse 1.2s ease-in-out infinite; }
 .mini i.done { background: var(--finished); animation: none; } .mini i.need { background: var(--needs); } .mini i.fail { background: var(--failed); animation: none; }
 .mini i.seen { background: #8e9ab3; animation: none; }
-.quiet { font-family: var(--display); font-weight: 600; font-size: clamp(20px, 3vmin + 10px, 30px); color: #c9cff7; }
+.quiet { font-family: var(--display); font-weight: 600; font-size: 22px; font-size: clamp(20px, 3vmin + 10px, 30px); color: #c9cff7; }
 .quiet small { display: block; font-family: var(--body); font-weight: 700; font-size: 14px; color: #8e9ab3; margin-top: 4px; }
 @keyframes pop { from { transform: scale(.6) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
 
-.fx { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
-#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+.fx { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 2; }
+#confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
 .z { position: absolute; font-family: var(--display); font-weight: 700; color: #b9c0ff; opacity: 0; animation: zz 3.6s ease-in infinite; }
 @keyframes zz { 0% { transform: translate(0,0) scale(.6); opacity: 0; } 20% { opacity: .9; } 100% { transform: translate(30px,-70px) scale(1.3); opacity: 0; } }
 .puff { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #9aa3b8; opacity: 0; animation: puff 2.4s ease-out infinite; }
@@ -96,7 +95,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 .row .msg { grid-column: 2; font-size: 14px; color: #c7cfe0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .row.unseen { border-color: #ffffff33; background: #ffffff12; }
 .row:active { transform: scale(.98); }
-.scrim { position: fixed; inset: 0; z-index: 7; background: #0008; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.scrim { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 7; background: #0008; opacity: 0; pointer-events: none; transition: opacity .3s; }
 .scrim.open { opacity: 1; pointer-events: auto; }
 .empty { color: #8e9ab3; text-align: center; padding: 20px; }
 
@@ -226,8 +225,8 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
                   <rect x="117" y="38" width="6" height="30" rx="3" fill="#9fb0cc"/>
                   <g class="dish-face">
                     <path d="M92 30 Q120 58 148 30 Q120 40 92 30 Z" fill="#e8edf6" stroke="#a9b6cf" stroke-width="2"/>
-                    <circle cx="120" cy="26" r="6" fill="var(--mood)"/>
-                    <circle cx="120" cy="26" r="11" fill="var(--mood)" opacity=".25"/>
+                    <circle cx="120" cy="26" r="6" style="fill:var(--mood)"/>
+                    <circle cx="120" cy="26" r="11" style="fill:var(--mood)" opacity=".25"/>
                   </g>
                 </g>
 
@@ -252,7 +251,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 
                 <!-- face screen -->
                 <rect x="68" y="88" width="104" height="76" rx="30" fill="url(#visorGlow)"/>
-                <rect x="68" y="88" width="104" height="76" rx="30" fill="none" stroke="var(--mood)" stroke-opacity=".35" stroke-width="2"/>
+                <rect x="68" y="88" width="104" height="76" rx="30" fill="none" style="stroke:var(--mood)" stroke-opacity=".35" stroke-width="2"/>
 
                 <g class="eyes-x">
                   <!-- sleep: closed arcs -->
@@ -260,27 +259,27 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
                     <path d="M90 126 q10 7 20 0"/><path d="M130 126 q10 7 20 0"/>
                   </g>
                   <!-- focus: narrowed bars -->
-                  <g class="eye-set eyes-focus" fill="var(--working)">
+                  <g class="eye-set eyes-focus" style="fill:var(--working)">
                     <rect class="blinkable" x="88" y="116" width="22" height="13" rx="6.5"/>
                     <rect class="blinkable" x="130" y="116" width="22" height="13" rx="6.5"/>
                   </g>
                   <!-- wide: big round eyes -->
                   <g class="eye-set eyes-wide">
-                    <circle class="blinkable" cx="99" cy="122" r="13" fill="var(--needs)"/>
-                    <circle class="blinkable" cx="141" cy="122" r="13" fill="var(--needs)"/>
+                    <circle class="blinkable" cx="99" cy="122" r="13" style="fill:var(--needs)"/>
+                    <circle class="blinkable" cx="141" cy="122" r="13" style="fill:var(--needs)"/>
                     <circle cx="104" cy="117" r="4" fill="#fff"/><circle cx="146" cy="117" r="4" fill="#fff"/>
                   </g>
                   <!-- happy: ^ ^ -->
-                  <g class="eye-set eyes-happy" fill="none" stroke="var(--finished)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+                  <g class="eye-set eyes-happy" fill="none" style="stroke:var(--finished)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M88 128 l11 -12 l11 12"/><path d="M130 128 l11 -12 l11 12"/>
                   </g>
                   <!-- dizzy: spirals -->
-                  <g class="eye-set eyes-dizzy" fill="none" stroke="var(--failed)" stroke-width="4" stroke-linecap="round">
+                  <g class="eye-set eyes-dizzy" fill="none" style="stroke:var(--failed)" stroke-width="4" stroke-linecap="round">
                     <path class="spiral" d="M99 122 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0 a11 11 0 1 1 -22 0"/>
                     <path class="spiral" d="M141 122 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0 a11 11 0 1 1 -22 0"/>
                   </g>
                   <!-- calm: content closed eyes (recording) -->
-                  <g class="eye-set eyes-calm" fill="none" stroke="var(--rec)" stroke-width="5" stroke-linecap="round">
+                  <g class="eye-set eyes-calm" fill="none" style="stroke:var(--rec)" stroke-width="5" stroke-linecap="round">
                     <path d="M90 124 q10 -8 20 0"/><path d="M130 124 q10 -8 20 0"/>
                   </g>
                 </g>
@@ -290,8 +289,8 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
                 <ellipse class="cheek" cx="156" cy="146" rx="9" ry="5" fill="#ff8fb0" opacity=".45"/>
 
                 <!-- status light on the tummy -->
-                <circle class="status-light" cx="120" cy="196" r="9" fill="var(--mood)"/>
-                <circle cx="120" cy="196" r="16" fill="var(--mood)" opacity=".18"/>
+                <circle class="status-light" cx="120" cy="196" r="9" style="fill:var(--mood)"/>
+                <circle cx="120" cy="196" r="16" style="fill:var(--mood)" opacity=".18"/>
 
                 <!-- laptop (working) -->
                 <g class="extra laptop">
@@ -302,16 +301,16 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 
                 <!-- sign (needs you) -->
                 <g class="extra sign">
-                  <rect x="150" y="6" width="84" height="52" rx="12" fill="#fff4dc" stroke="var(--needs)" stroke-width="4"/>
+                  <rect x="150" y="6" width="84" height="52" rx="12" fill="#fff4dc" style="stroke:var(--needs)" stroke-width="4"/>
                   <text x="192" y="40" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="22" fill="#8a5a00">HEY!</text>
                   <rect x="186" y="56" width="6" height="40" rx="3" fill="#c79a4a"/>
                 </g>
                 <g class="extra alert-mark">
-                  <text x="40" y="70" font-family="Fredoka, sans-serif" font-weight="700" font-size="34" fill="var(--needs)">!</text>
+                  <text x="40" y="70" font-family="Fredoka, sans-serif" font-weight="700" font-size="34" style="fill:var(--needs)">!</text>
                 </g>
 
                 <!-- sparkles (finished) -->
-                <g class="extra sparkle" fill="var(--finished)">
+                <g class="extra sparkle" style="fill:var(--finished)">
                   <path d="M30 70 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 l10 -4 Z"/>
                   <path d="M206 58 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 l8 -3 Z"/>
                   <path d="M214 150 l3 7 l7 3 l-7 3 l-3 7 l-3 -7 l-7 -3 l7 -3 Z" opacity=".7"/>
@@ -326,12 +325,12 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
                 <!-- headphones + shh (recording) -->
                 <g class="extra headphones">
                   <path d="M50 120 Q50 40 120 40 Q190 40 190 120" fill="none" stroke="#2c3550" stroke-width="10" stroke-linecap="round"/>
-                  <rect x="36" y="104" width="24" height="44" rx="10" fill="var(--rec)"/>
-                  <rect x="180" y="104" width="24" height="44" rx="10" fill="var(--rec)"/>
+                  <rect x="36" y="104" width="24" height="44" rx="10" style="fill:var(--rec)"/>
+                  <rect x="180" y="104" width="24" height="44" rx="10" style="fill:var(--rec)"/>
                 </g>
                 <g class="extra shh">
                   <circle cx="120" cy="152" r="6" fill="#ff8fb0"/>
-                  <text x="196" y="186" font-family="Fredoka, sans-serif" font-weight="700" font-size="18" fill="var(--rec)">shh</text>
+                  <text x="196" y="186" font-family="Fredoka, sans-serif" font-weight="700" font-size="18" style="fill:var(--rec)">shh</text>
                 </g>
               </g>
             </svg>
@@ -367,7 +366,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
   let state = { sessions: [], connected: true, recording: false };
   let mood = null, lastKey = '';
 
-  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const title = s => s.title || s.project || 'Claude chat';
   const ago = iso => {
     const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
@@ -530,8 +529,15 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
     else if (open && dy > 80 && $('list').scrollTop <= 0) openSheet(false);
   }, { passive: true });
 
-  function layout() { document.body.classList.toggle('portrait', innerHeight > innerWidth); }
-  addEventListener('resize', layout); layout();
+  function sizeGoGo() {
+    const z = document.querySelector('.gogo-zone'), btn = $('gogoBtn');
+    const w = z.clientWidth, h = z.clientHeight - 30;
+    if (!w || !h) return;
+    const W = Math.max(80, Math.min(w * (document.body.classList.contains('portrait') ? 0.64 : 0.78), (h * 0.9) * 240 / 268));
+    btn.style.width = W + 'px'; btn.style.height = (W * 268 / 240) + 'px';
+  }
+  function layout() { document.body.classList.toggle('portrait', innerHeight > innerWidth); sizeGoGo(); }
+  addEventListener('resize', layout); layout(); setTimeout(layout, 300);
   setInterval(render, 30000); // refresh "x min ago" and night mode
 
   window.gogo = {
