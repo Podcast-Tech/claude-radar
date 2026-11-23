@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
-import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -59,7 +58,7 @@ object Alerter {
         runCatching { NotificationManagerCompat.from(ctx).notify(s.sessionId.hashCode(), n) }
         _flashes.tryEmit(s)
         if (!recording) {
-            playSound(ctx, urgent)
+            Chirps.play(s.status) // GoGo's chirp for this kind of alert
             vibrate(ctx, urgent)
         }
     }
@@ -72,25 +71,6 @@ object Alerter {
             updatedAt = java.time.OffsetDateTime.now().toString(),
         ),
     )
-
-    private fun playSound(ctx: Context, urgent: Boolean) {
-        runCatching {
-            val uri: Uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                ?: return
-            val r = RingtoneManager.getRingtone(ctx, uri) ?: return
-            r.audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-            r.play()
-            if (urgent) {
-                // Second chime for "needs you".
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    runCatching { RingtoneManager.getRingtone(ctx, uri)?.play() }
-                }, 900)
-            }
-        }
-    }
 
     private fun vibrate(ctx: Context, urgent: Boolean) {
         runCatching {

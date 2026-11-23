@@ -1,0 +1,27 @@
+package com.poddster.clauderadar
+
+import android.os.Handler
+import android.os.Looper
+import android.webkit.JavascriptInterface
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/** What the GoGo screen needs to know. Field names match the JSON the page reads. */
+@Serializable
+data class GoGoState(val sessions: List<RadarSession>, val connected: Boolean, val recording: Boolean)
+
+val GoGoJson = Json { encodeDefaults = true; explicitNulls = true }
+
+/** Calls from the GoGo page back into the app (always handled on the main thread). */
+class GoGoBridge(
+    private val onTap: (String) -> Unit,
+    private val onRemove: (String) -> Unit,
+    private val onBoop: () -> Unit,
+    private val onReady: () -> Unit,
+) {
+    private val main = Handler(Looper.getMainLooper())
+    @JavascriptInterface fun tap(id: String) { main.post { onTap(id) } }
+    @JavascriptInterface fun remove(id: String) { main.post { onRemove(id) } }
+    @JavascriptInterface fun boop() { main.post { onBoop() } }
+    @JavascriptInterface fun ready() { main.post { onReady() } }
+}

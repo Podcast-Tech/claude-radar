@@ -7,6 +7,9 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import android.webkit.WebView
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.layout.widthIn
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -185,53 +188,66 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
     var update by remember { mutableStateOf<Updater.Release?>(null) }
     var updateProgress by remember { mutableStateOf<Float?>(null) }
     var updateMsg by remember { mutableStateOf<String?>(null) }
-    val now by produceState(Instant.now()) { while (true) { delay(30_000); value = Instant.now() } }
     var showChecks by remember { mutableStateOf(false) }
     val checks by produceState(Alerter.checks(ctx)) { while (true) { value = Alerter.checks(ctx); delay(5_000) } }
-    var flash by remember { mutableStateOf<RadarSession?>(null) }
-    LaunchedEffect(Unit) { Alerter.flashes.collect { flash = it; delay(4_000); flash = null } }
 
     LaunchedEffect(Unit) { update = runCatching { Updater.check() }.getOrNull() }
 
-    val overall = overallOf(sessions)
-    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
-        0f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "p",
-    )
-    val target = when (overall) {
-        Overall.NEEDS_YOU -> lerp(Orange, Color(0xFF7A3A00), if (recording) 0.5f else pulse)
-        Overall.FAILED -> Red
-        Overall.FINISHED -> Green
-        Overall.WORKING -> DimBlue
-        Overall.IDLE -> Color.Black
+    // GoGo lives in a WebView (assets/gogo/index.html); the app feeds it the chats.
+    var web by remember { mutableStateOf<WebView?>(null) }
+    var webReady by remember { mutableStateOf(false) }
+    val payload = remember(sessions, connected, recording) {
+        GoGoJson.encodeToString(GoGoState(sessions, connected, recording))
     }
-    val flashColor = when (flash?.status) {
-        null -> null
-        "needs_you" -> Orange
-        "failed" -> Red
-        else -> Color.White
+    LaunchedEffect(webReady, payload) {
+        if (webReady) web?.evaluateJavascript("window.gogo && gogo.update($payload)", null)
     }
-    val bg by animateColorAsState(flashColor ?: target, label = "bg")
-    val need = sessions.count { it.unseen && it.status == "needs_you" }
-    val headline = when (overall) {
-        Overall.NEEDS_YOU -> if (need == 1) "1 chat needs you" else "$need chats need you"
-        Overall.FAILED -> "Something failed"
-        Overall.FINISHED -> sessions.count { it.unseen && it.status == "finished" }.let { if (it == 1) "1 finished" else "$it finished" }
-        Overall.WORKING -> "Claude is working"
-        Overall.IDLE -> "All quiet"
+    LaunchedEffect(webReady) {
+        if (webReady) Alerter.flashes.collect { web?.evaluateJavascript("window.gogo && gogo.celebrate()", null) }
     }
 
-    Column(Modifier.fillMaxSize().background(bg).systemBarsPadding().padding(horizontal = 16.dp)) {
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).background(if (connected) Green else Red, CircleShape))
-            Spacer(Modifier.width(8.dp))
-            Text(if (connected) "Live" else "Reconnecting…", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
-            Spacer(Modifier.weight(1f))
+    Box(Modifier.fillMaxSize().background(Color(0xFF070A12))) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize().systemBarsPadding(),
+            factory = { c ->
+                WebView(c).apply {
+                    setBackgroundColor(android.graphics.Color.parseColor("#070A12"))
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.mediaPlaybackRequiresUserGesture = false
+                    isVerticalScrollBarEnabled = false
+                    isHorizontalScrollBarEnabled = false
+                    overScrollMode = android.view.View.OVER_SCROLL_NEVER
+                    addJavascriptInterface(
+                        GoGoBridge(
+                            onTap = { id ->
+                                val s = RadarStore.sessions.value.firstOrNull { it.sessionId == id }
+                                scope.launch { RadarStore.markSeen(id) }
+                                s?.url?.let { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
+                            },
+                            onRemove = { id -> scope.launch { RadarStore.remove(id) } },
+                            onBoop = { if (!Prefs.recording(ctx)) Chirps.play("boop") },
+                            onReady = { webReady = true },
+                        ),
+                        "Android",
+                    )
+                    loadUrl("file:///android_asset/gogo/index.html")
+                    web = this
+                }
+            },
+        )
+
+        Row(
+            Modifier.align(Alignment.TopEnd).systemBarsPadding().padding(top = 2.dp, end = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             FilterChip(
                 selected = recording,
                 onClick = { recording = !recording; Prefs.setRecording(ctx, recording) },
-                label = { Text(if (recording) "● REC – silent" else "Recording mode") },
+                label = { Text(if (recording) "● REC" else "REC") },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Red, selectedLabelColor = Color.White, labelColor = Color.White,
+                    containerColor = Color(0x22FFFFFF), labelColor = Color.White,
+                    selectedContainerColor = Color(0xFFFF6FA8), selectedLabelColor = Color.White,
                 ),
             )
             Box {
@@ -264,59 +280,39 @@ private fun RadarScreen(onKeepScreenOnChanged: () -> Unit) {
             }
         }
 
-        Text(headline, color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.Bold, lineHeight = 44.sp,
-            modifier = Modifier.padding(top = 12.dp, bottom = 12.dp))
-
-        flash?.let { f ->
-            Banner {
-                Text("${f.displayTitle}: " + when (f.status) { "needs_you" -> "needs you"; "failed" -> "failed"; else -> "finished" },
-                    color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-            }
-        }
-        val blocked = checks.filter { !it.ok }
-        if (blocked.isNotEmpty()) {
-            Banner {
-                Text("Alerts may not reach you: " + blocked.joinToString { it.label.lowercase() },
-                    color = Color.White, modifier = Modifier.weight(1f))
-                TextButton(onClick = { showChecks = true }) { Text("Fix", color = Orange) }
-            }
-        }
-        update?.let { rel ->
-            Banner {
-                Column(Modifier.weight(1f)) {
-                    Text("Update ${rel.version} available", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    updateProgress?.let { LinearProgressIndicator(progress = { it }, Modifier.fillMaxWidth().padding(top = 6.dp)) }
+        Column(
+            Modifier.align(Alignment.BottomCenter).systemBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 56.dp)
+                .widthIn(max = 520.dp),
+        ) {
+            val blocked = checks.filter { !it.ok }
+            if (blocked.isNotEmpty()) {
+                Banner {
+                    Text("Alerts may not reach you: " + blocked.joinToString { it.label.lowercase() },
+                        color = Color.White, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showChecks = true }) { Text("Fix", color = Orange) }
                 }
-                TextButton(enabled = updateProgress == null, onClick = {
-                    if (!Updater.canInstall(ctx)) { Updater.openInstallPermission(ctx); return@TextButton }
-                    scope.launch {
-                        updateProgress = 0f
-                        runCatching { Updater.downloadAndInstall(ctx, rel) { updateProgress = it } }
-                            .onFailure { updateMsg = "Update failed: ${it.message}" }
-                        updateProgress = null
+            }
+            update?.let { rel ->
+                Banner {
+                    Column(Modifier.weight(1f)) {
+                        Text("Update ${rel.version} available", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        updateProgress?.let { LinearProgressIndicator(progress = { it }, Modifier.fillMaxWidth().padding(top = 6.dp)) }
                     }
-                }) { Text("Install", color = Color.White) }
+                    TextButton(enabled = updateProgress == null, onClick = {
+                        if (!Updater.canInstall(ctx)) { Updater.openInstallPermission(ctx); return@TextButton }
+                        scope.launch {
+                            updateProgress = 0f
+                            runCatching { Updater.downloadAndInstall(ctx, rel) { updateProgress = it } }
+                                .onFailure { updateMsg = "Update failed: ${it.message}" }
+                            updateProgress = null
+                        }
+                    }) { Text("Install", color = Color.White) }
+                }
             }
-        }
-        updateMsg?.let { Banner { Text(it, color = Color.White, modifier = Modifier.weight(1f)) } }
-
-        if (sessions.isEmpty()) {
-            Text(
-                "No chats yet. Start a Claude Code chat on your PC and it will show up here.",
-                color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(top = 24.dp),
-            )
-        }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-            items(sessions, key = { it.sessionId }) { s ->
-                SessionRow(s, now, Modifier.combinedClickable(
-                    onClick = {
-                        scope.launch { RadarStore.markSeen(s.sessionId) }
-                        s.url?.let { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
-                    },
-                    onLongClick = { scope.launch { RadarStore.remove(s.sessionId) } },
-                ))
+            updateMsg?.let { m ->
+                LaunchedEffect(m) { delay(6_000); if (updateMsg == m) updateMsg = null }
+                Banner { Text(m, color = Color.White, modifier = Modifier.weight(1f)) }
             }
-            item { Spacer(Modifier.height(16.dp)) }
         }
     }
 
