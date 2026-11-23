@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>GoGo</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GoGo">
+<meta name="theme-color" content="#0a0f1a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="gogo/fonts.css">
+<style>
+:root { color-scheme: dark; --display: "Fredoka", ui-rounded, system-ui, sans-serif; --body: "Nunito", ui-rounded, system-ui, sans-serif;
+  --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px); --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #0a0f1a; color: #eef2fa; font-family: var(--body); overflow: hidden; }
+[hidden] { display: none !important; }
+#frame { position: fixed; top: var(--st); bottom: var(--sb); left: var(--sl); right: var(--sr); width: calc(100% - var(--sl) - var(--sr)); height: calc(100% - var(--st) - var(--sb)); border: 0; background: #0a0f1a; }
+
+.controls { position: fixed; top: calc(var(--st) + 10px); right: calc(var(--sr) + 12px); z-index: 20; display: flex; gap: 8px; align-items: center; }
+.pill { font-family: var(--display); font-weight: 600; font-size: 14px; color: #e6ecfa; background: #ffffff16; border: 1px solid #ffffff26; border-radius: 999px; height: 36px; padding: 0 14px; }
+.pill.on { background: #ff6fa8; border-color: #ff6fa8; color: #2a0716; }
+.pill.icon { width: 36px; padding: 0; font-size: 20px; line-height: 1; }
+
+.menu { position: fixed; top: calc(var(--st) + 54px); right: calc(var(--sr) + 12px); z-index: 30; min-width: 250px; max-height: calc(100% - var(--st) - 80px); overflow: auto;
+  background: #161d2e; border: 1px solid #ffffff1f; border-radius: 18px; padding: 6px; box-shadow: 0 20px 50px #0009; }
+.menu button { display: flex; width: 100%; justify-content: space-between; gap: 12px; text-align: left; background: none; border: 0; color: #eef2fa; font: 600 15px var(--body); padding: 12px 12px; border-radius: 12px; }
+.menu button:active { background: #ffffff10; }
+.menu button small { color: #8e9ab3; font-weight: 600; }
+.menu hr { border: 0; border-top: 1px solid #ffffff14; margin: 4px 6px; }
+.menu .ver { color: #8e9ab3; font-size: 12px; padding: 8px 12px 6px; }
+.veil { position: fixed; inset: 0; z-index: 25; }
+
+.banner { position: fixed; left: calc(var(--sl) + 12px); right: calc(var(--sr) + 12px); bottom: calc(var(--sb) + 64px); z-index: 15;
+  background: #1b2438; border: 1px solid #ffb21e66; border-radius: 18px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 12px 30px #0008; }
+.banner p { margin: 0; flex: 1; font-size: 14px; line-height: 1.35; }
+.banner b { font-family: var(--display); }
+.btn { font: 600 15px var(--display); border: 0; border-radius: 999px; padding: 10px 16px; background: #ffb21e; color: #2a1a00; white-space: nowrap; }
+.btn.ghost { background: #ffffff16; color: #e6ecfa; }
+.btn.blue { background: #5aa8ff; color: #06101f; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--sb) + 130px); z-index: 40; background: #eef2fa; color: #0a0f1a;
+  border-radius: 999px; padding: 10px 16px; font: 600 14px var(--body); box-shadow: 0 10px 30px #0008; max-width: calc(100% - 32px); display: flex; gap: 10px; align-items: center; }
+.toast a { color: #1d4f8c; font-weight: 800; text-decoration: none; white-space: nowrap; }
+
+/* sign in + install screens */
+.card-screen { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: calc(var(--st) + 20px) 20px calc(var(--sb) + 20px);
+  background: radial-gradient(90% 50% at 50% 20%, rgba(124,134,255,.25), transparent 70%), #0a0f1a; overflow: auto; }
+.card { width: 100%; max-width: 380px; text-align: center; }
+.card h1 { font: 700 30px var(--display); margin: 10px 0 4px; }
+.card .sub { color: #a9b4cc; margin: 0 0 22px; line-height: 1.45; }
+.card img { width: 110px; height: 110px; border-radius: 26px; }
+.card input { width: 100%; font: 600 17px var(--body); color: #eef2fa; background: #ffffff10; border: 1px solid #ffffff26; border-radius: 14px; padding: 14px; margin: 0 0 10px; outline: none; }
+.card input:focus { border-color: #7c86ff; }
+.card .btn { width: 100%; padding: 14px; font-size: 17px; margin-top: 4px; background: #7c86ff; color: #0b0e2a; }
+.card .link { background: none; border: 0; color: #a9b4cc; font: 600 15px var(--body); margin-top: 14px; text-decoration: underline; }
+.card .err { color: #ff8a8e; min-height: 20px; font-size: 14px; margin: 4px 0; }
+.steps { text-align: left; background: #ffffff0c; border: 1px solid #ffffff1a; border-radius: 18px; padding: 6px 16px; margin: 0 0 16px; }
+.steps li { margin: 12px 0; line-height: 1.4; }
+.share { display: inline-block; width: 20px; height: 20px; vertical-align: -4px; }
+</style>
+</head>
+<body>
+
+<iframe id="frame" title="GoGo" hidden></iframe>
+
+<div class="controls" id="controls" hidden>
+  <button class="pill" id="recBtn">REC</button>
+  <button class="pill icon" id="menuBtn" aria-label="Menu">⋮</button>
+</div>
+<div class="veil" id="veil" hidden></div>
+<div class="menu" id="menu" hidden>
+  <button id="mNotif">iPhone alerts <small id="mNotifState">Off</small></button>
+  <button id="mTest">Send a test alert</button>
+  <hr>
+  <button id="mTalk">GoGo talks out loud <small id="mTalkState">On</small></button>
+  <button id="mRest">GoGo rests after <small id="mRestState">10 min</small></button>
+  <button id="mAwake">Keep screen on <small id="mAwakeState">Off</small></button>
+  <hr>
+  <button id="mAll">Mark all as seen</button>
+  <button id="mClear">Clear seen results</button>
+  <hr>
+  <button id="mOut">Sign out</button>
+  <div class="ver" id="ver"></div>
+</div>
+
+<div class="banner" id="notifBanner" hidden>
+  <p><b>Turn on iPhone alerts</b><br>So GoGo can ping you when the app is closed.</p>
+  <button class="btn" id="notifOn">Turn on</button>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<section class="card-screen" id="install" hidden>
+  <div class="card">
+    <img src="icon-180.png" alt="">
+    <h1>Add GoGo to your iPhone</h1>
+    <p class="sub">iPhone only allows alerts from apps on the Home Screen. It takes 10 seconds:</p>
+    <ol class="steps">
+      <li>Tap the <b>Share</b> button <svg class="share" viewBox="0 0 24 24" fill="none" stroke="#5aa8ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> at the bottom of Safari.</li>
+      <li>Scroll down, tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+      <li>Open <b>GoGo</b> from your Home Screen and sign in.</li>
+    </ol>
+    <p class="sub" id="notSafari" hidden>Open this page in <b>Safari</b> first (other browsers can't add it to the Home Screen).</p>
+    <button class="link" id="skipInstall">Just look around in the browser</button>
+  </div>
+</section>
+
+<section class="card-screen" id="login" hidden>
+  <form class="card" id="loginForm">
+    <img src="icon-180.png" alt="">
+    <h1>Hi, I'm GoGo!</h1>
+    <p class="sub">Sign in with the same account as your Android app and PCs.</p>
+    <input id="email" type="email" autocomplete="username" placeholder="Email" required>
+    <input id="password" type="password" autocomplete="current-password" placeholder="Password" required minlength="6">
+    <div class="err" id="loginErr"></div>
+    <button class="btn" id="loginBtn" type="submit">Sign in</button>
+    <button class="link" id="signupBtn" type="button">New here? Create an account</button>
+  </form>
+</section>
+
+<script src="vendor/supabase-2.118.0.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

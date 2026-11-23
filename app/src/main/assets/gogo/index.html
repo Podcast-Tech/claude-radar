@@ -400,7 +400,7 @@ html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-
 
 <script>
 (() => {
-  const A = window.Android || { seen(){}, open(){}, seenAll(){}, remove(){}, boop(){}, ready(){}, speak(){}, listen(){}, setRecording(){} };
+  const A = window.Android || (window.parent !== window && window.parent.RadarBridge) || { seen(){}, open(){}, seenAll(){}, remove(){}, boop(){}, ready(){}, speak(){}, listen(){}, setRecording(){} };
   const $ = id => document.getElementById(id);
   const screen = $('screen'), gogo = $('gogo'), cards = $('cards'), fx = $('fx');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;

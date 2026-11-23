@@ -67,6 +67,16 @@ Cloud sessions run on Anthropic's servers, so they're set up through the cloud e
    ```
 New cloud sessions then report as **Cloud**. Tapping one on the phone opens that chat in the Claude app.
 
+### 5. iPhone (iOS 16.4 or newer)
+The iPhone version is a Home Screen web app: same GoGo, real notifications, no App Store needed.
+1. On the iPhone, open **https://podcast-tech.github.io/claude-radar/** in **Safari**.
+2. Tap **Share** → **Add to Home Screen** → **Add**.
+3. Open **GoGo** from the Home Screen, sign in, tap **Turn on** for iPhone alerts and allow them.
+
+A test alert arrives right away. **REC** pauses this iPhone's alerts. Differences from Android: no "Hey GoGo" wake word (iPhone doesn't let web apps listen in the background), and to keep it on as a desk display set *Settings › Display & Brightness › Auto-Lock › Never*.
+
+Hosting: GitHub Pages serves the `docs/` folder (Settings → Pages → Deploy from a branch → `main` / `/docs`). After editing GoGo, run `scripts/sync-iphone.sh` to copy her into `docs/gogo/`.
+
 ## Updates
 The app checks GitHub Releases at launch and every 6 hours. Tap **Install** on the banner. Every release is signed with the same key, so it installs over the old version and keeps you signed in.
 
@@ -101,5 +111,6 @@ Hook errors are logged to `%USERPROFILE%\.claude-radar\hook-errors.log`.
 - `windows/`: PowerShell installer and hook
 - `mac/`: macOS installer and hook (bash + perl)
 - `cloud/`: setup for Claude Code on the web (reuses the Mac hook)
+- `docs/`: iPhone web app (GitHub Pages), with a copy of GoGo in `docs/gogo/`
 - `supabase/`: database schema and the `report` edge function
 - `.github/workflows/release.yml`: signed release builds

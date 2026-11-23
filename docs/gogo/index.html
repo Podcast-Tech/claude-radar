@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>GoGo</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+:root {
+  color-scheme: dark;
+  --working: #5aa8ff; --needs: #ffb21e; --finished: #3ee0a0; --failed: #ff5d62; --rec: #ff6fa8; --sleep: #7c86ff;
+  --mood: var(--sleep); --glow: rgba(124,134,255,.28); --tagbg: #e6e8ff; --tagfg: #3a3f8a;
+  --display: "Fredoka", ui-rounded, system-ui, sans-serif;
+  --body: "Nunito", ui-rounded, system-ui, sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #070a12; color: #eef2fa; font-family: var(--body); overflow: hidden; user-select: none; -webkit-user-select: none; }
+
+.screen {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: grid; grid-template-columns: 1.05fr 1fr;
+  background: radial-gradient(60% 80% at 28% 55%, var(--glow), transparent 70%), linear-gradient(180deg, #101828, #0a0f1a);
+  transition: filter .8s;
+}
+.portrait .screen { grid-template-columns: 1fr; grid-template-rows: 1.15fr 1fr;
+  background: radial-gradient(90% 50% at 50% 30%, var(--glow), transparent 70%), linear-gradient(180deg, #101828, #0a0f1a); }
+.screen[data-mood="sleep"] { filter: brightness(.7); }
+.screen.night { filter: brightness(.5) saturate(.8); }
+.screen.offline { filter: grayscale(.7) brightness(.7); }
+
+.topbar { position: fixed; top: 0; left: 0; right: 0; padding: 16px 150px 0 18px; display: flex; gap: 14px; align-items: center;
+  font-family: var(--display); font-weight: 600; font-size: 15px; color: #c9d2e6; z-index: 5; pointer-events: none; }
+.topbar .live::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--finished); margin-right: 6px; }
+.topbar .live.off::before { background: var(--failed); }
+.topbar .rec { color: var(--rec); display: none; }
+.recording .topbar .rec { display: inline; }
+.topbar .tally { margin-left: auto; opacity: .8; font-variant-numeric: tabular-nums; }
+.topbar .live, .topbar .rec { white-space: nowrap; }
+.portrait .topbar { flex-wrap: wrap; row-gap: 2px; }
+.portrait .topbar .tally { margin-left: 0; flex-basis: 100%; font-size: 13px; }
+
+.gogo-zone { position: relative; display: grid; place-items: center; min-height: 0; padding-top: 30px; }
+#gogoBtn { background: none; border: 0; padding: 0; width: 40vmin; height: 44.7vmin; cursor: pointer; } /* sized by sizeGoGo() */
+#gogoBtn svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.drift { width: 100%; height: 100%; display: grid; place-items: center; }
+
+.card-zone { position: relative; display: grid; align-content: center; gap: 12px; padding: 54px 22px 64px 4px; min-width: 0; }
+.portrait .card-zone { padding: 0 22px 76px; align-content: start; }
+.bubble { background: #f6f8fd; color: #141a28; border-radius: 22px; padding: 16px 18px; position: relative; box-shadow: 0 10px 30px -12px #000;
+  animation: pop .45s cubic-bezier(.2, 1.6, .4, 1) both; }
+.bubble::before { content: ""; position: absolute; left: -10px; top: 38%; border: 10px solid transparent; border-right-color: #f6f8fd; border-left: 0; }
+.portrait .bubble::before { left: 24%; top: -10px; border: 10px solid transparent; border-bottom-color: #f6f8fd; border-top: 0; }
+.bubble .tag { display: inline-block; font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 12px;
+  padding: 3px 10px; border-radius: 999px; background: var(--tagbg); color: var(--tagfg); }
+.bubble h3 { font-family: var(--display); font-weight: 700; margin: 8px 0 4px; font-size: 19px; font-size: clamp(17px, 3.4vmin + 6px, 26px); line-height: 1.15; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bubble p { margin: 0; color: #4a5470; font-size: 15px; font-size: clamp(13px, 1.6vmin + 8px, 17px); line-height: 1.35; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.bubble .meta { margin-top: 8px; font-size: 13px; color: #7a84a0; font-weight: 800; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.more.act { font-family: var(--body); cursor: pointer; background: #ffffff24; }
+.more { justify-self: start; font-weight: 800; font-size: 13px; color: #dfe6f5; background: #ffffff14; border: 1px solid #ffffff22; border-radius: 999px; padding: 5px 12px; }
+.minis { display: grid; gap: 9px; }
+.mini { display: flex; align-items: center; gap: 10px; background: #ffffff12; border: 1px solid #ffffff1c; border-radius: 14px; padding: 10px 14px;
+  font-weight: 800; font-size: 15px; color: #dfe6f5; min-width: 0; }
+.mini span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mini small { margin-left: auto; color: #8e9ab3; font-weight: 700; flex: none; }
+.mini i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--working); animation: pulse 1.2s ease-in-out infinite; }
+.mini i.done { background: var(--finished); animation: none; } .mini i.need { background: var(--needs); } .mini i.fail { background: var(--failed); animation: none; }
+.mini i.seen { background: #8e9ab3; animation: none; }
+.quiet { font-family: var(--display); font-weight: 600; font-size: 22px; font-size: clamp(20px, 3vmin + 10px, 30px); color: #c9cff7; }
+.quiet small { display: block; font-family: var(--body); font-weight: 700; font-size: 14px; color: #8e9ab3; margin-top: 4px; }
+@keyframes pop { from { transform: scale(.6) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
+
+.fx { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; z-index: 2; }
+#confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+.z { position: absolute; font-family: var(--display); font-weight: 700; color: #b9c0ff; opacity: 0; animation: zz 3.6s ease-in infinite; }
+@keyframes zz { 0% { transform: translate(0,0) scale(.6); opacity: 0; } 20% { opacity: .9; } 100% { transform: translate(30px,-70px) scale(1.3); opacity: 0; } }
+.puff { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #9aa3b8; opacity: 0; animation: puff 2.4s ease-out infinite; }
+@keyframes puff { 0% { transform: translate(0,0) scale(.4); opacity: .7; } 100% { transform: translate(var(--dx, 10px), -60px) scale(1.8); opacity: 0; } }
+
+
+/* ---------- GoGo talks ---------- */
+.say { position: absolute; left: 0; right: 0; margin: 0 auto; width: -webkit-max-content; width: max-content; top: 40px; z-index: 6; max-width: 86%;
+  background: #fff; color: #1b2033; border-radius: 18px; padding: 10px 14px; font-family: var(--display); font-weight: 600;
+  font-size: 17px; font-size: clamp(14px, 2.2vmin + 8px, 20px); line-height: 1.25; box-shadow: 0 10px 30px -10px #000;
+  animation: pop .4s cubic-bezier(.2, 1.6, .4, 1) both; pointer-events: none; text-align: center; }
+.say::after { content: ""; position: absolute; left: 50%; bottom: -9px; margin-left: -9px; border: 9px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.say.you { background: #22304f; color: #e8eefc; }
+.say.you::after { border-top-color: #22304f; }
+.say .dots i { display: inline-block; width: 6px; height: 6px; margin: 0 2px; border-radius: 50%; background: currentColor; animation: pulse 1s infinite; }
+.say .dots i:nth-child(2) { animation-delay: .15s; } .say .dots i:nth-child(3) { animation-delay: .3s; }
+.gg.listening .dish-face { animation: scan .35s linear infinite !important; }
+.gg.listening .eyes-x { transform: translateY(-3px); }
+.ears { position: absolute; left: 50%; top: 55%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; pointer-events: none; display: none; z-index: 0; }
+.gogo-zone .drift { position: relative; z-index: 1; }
+.listening-on .ears { display: block; animation: ring 1.4s ease-out infinite; box-shadow: 0 0 0 0 rgba(90,168,255,.6); }
+@keyframes ring { from { box-shadow: 0 0 0 0 rgba(90,168,255,.55); } to { box-shadow: 0 0 0 30vmin rgba(90,168,255,0); } }
+
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 0 14px 10px; flex-wrap: wrap; pointer-events: none; }
+.dock > * { pointer-events: auto; }
+.dock .chip, .dock .round { background: #ffffff16; border: 1px solid #ffffff26; color: #e6ecfa; border-radius: 999px; font-family: var(--display);
+  font-weight: 600; font-size: 14px; padding: 8px 13px; white-space: nowrap; }
+.dock .round { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; font-size: 18px; }
+.dock .round.live { background: #5aa8ff; border-color: #5aa8ff; color: #06101f; }
+.dock .spacer { flex: 1; }
+.dock .handle { position: static; transform: none; }
+.ask { display: none; position: fixed; left: 12px; right: 12px; bottom: 60px; z-index: 9; }
+.ask.open { display: flex; gap: 8px; }
+.ask input { flex: 1; min-width: 0; border-radius: 999px; border: 1px solid #ffffff33; background: #121a2b; color: #fff; font: 600 16px var(--body); padding: 10px 16px; outline: none; }
+.ask button { border-radius: 999px; border: 0; background: #5aa8ff; color: #06101f; font: 700 15px var(--display); padding: 0 18px; }
+.recording .dock .round.mic { opacity: .4; }
+.portrait .card-zone { padding-bottom: 110px; }
+
+/* swipe-up sheet with every chat */
+.handle { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 6; background: #ffffff16; border: 1px solid #ffffff26;
+  color: #dfe6f5; border-radius: 999px; padding: 8px 16px; font-family: var(--display); font-weight: 600; font-size: 14px; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 78%; z-index: 8; background: #121a2b; border-radius: 26px 26px 0 0;
+  box-shadow: 0 -20px 50px -10px #000; transform: translateY(105%); transition: transform .35s cubic-bezier(.2, .9, .3, 1); display: grid; grid-template-rows: auto 1fr; }
+.sheet.open { transform: none; }
+.sheet header { padding: 10px 20px 8px; display: grid; gap: 6px; }
+.sheet header::before { content: ""; justify-self: center; width: 44px; height: 5px; border-radius: 3px; background: #ffffff33; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+[hidden] { display: none !important; }
+.sheet h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 19px; }
+.sheet h2 small { font-family: var(--body); font-size: 13px; color: #8e9ab3; font-weight: 700; margin-left: 8px; }
+.list { overflow-y: auto; padding: 4px 14px 22px; display: grid; gap: 8px; align-content: start; }
+.row { display: grid; grid-template-columns: 14px 1fr; gap: 4px 12px; align-items: start; background: #ffffff0a; border: 1px solid #ffffff14; border-radius: 16px; padding: 12px 14px; }
+.row i { width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; }
+.row b { font-family: var(--display); font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
+.row .sub { grid-column: 2; font-size: 13px; color: #8e9ab3; font-weight: 700; }
+.row .msg { grid-column: 2; font-size: 14px; color: #c7cfe0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row.unseen { border-color: #ffffff33; background: #ffffff12; }
+.row:active, .bubble:active { transform: scale(.98); }
+.tapped { outline: 3px solid var(--mood); }
+.scrim { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 7; background: #0008; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+.empty { color: #8e9ab3; text-align: center; padding: 20px; }
+
+/* ---------- GoGo ---------- */
+.gg * { transform-box: fill-box; }
+.gg .whole { transform-origin: 50% 100%; animation: breathe 3.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: translateY(-3px) scaleY(1.012); } }
+.gg .dish { transform-origin: 50% 100%; transition: transform .3s; }
+.gg .dish-face { transform-origin: 50% 50%; }
+.gg .arm { transition: transform .4s cubic-bezier(.3, 1.5, .5, 1); }
+.gg .arm.l { transform-origin: 85% 12%; }
+.gg .arm.r { transform-origin: 15% 12%; }
+.gg .eye-set { display: none; }
+.gg .eyes-x { transition: transform .5s ease; }
+.gg .status-light { transition: fill .4s; }
+.gg .extra { display: none; }
+.gg .blinkable { transform-origin: 50% 50%; }
+.gg.blink .blinkable { transform: scaleY(.1); }
+
+/* eyes per mood */
+.gg[data-mood="sleep"] .eyes-sleep,
+.gg[data-mood="working"] .eyes-focus,
+.gg[data-mood="needs"] .eyes-wide,
+.gg[data-mood="finished"] .eyes-happy,
+.gg[data-mood="failed"] .eyes-dizzy,
+.gg[data-mood="recording"] .eyes-calm,
+.gg.boop .eyes-happy { display: block; }
+.gg.boop .eye-set:not(.eyes-happy) { display: none; }
+
+/* sleep */
+.gg[data-mood="sleep"] .whole { animation: snooze 4.8s ease-in-out infinite; }
+@keyframes snooze { 50% { transform: translateY(2px) scaleY(.985) rotate(-1.5deg); } }
+.gg[data-mood="sleep"] .dish { transform: rotate(-28deg); }
+.gg[data-mood="sleep"] .arm.l { transform: rotate(8deg); }
+.gg[data-mood="sleep"] .arm.r { transform: rotate(-8deg); }
+.night .gg .nightcap { display: block; }
+
+/* working */
+.gg[data-mood="working"] .dish-face { animation: scan 1.4s ease-in-out infinite; }
+@keyframes scan { 0%,100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
+.gg[data-mood="working"] .eyes-x { animation: look 3.2s ease-in-out infinite; }
+@keyframes look { 0%, 30% { transform: translateX(-5px); } 50%, 80% { transform: translateX(5px); } }
+.gg[data-mood="working"] .arm.l { animation: type 0.36s ease-in-out infinite alternate; }
+.gg[data-mood="working"] .arm.r { animation: type 0.36s ease-in-out infinite alternate-reverse; }
+@keyframes type { from { transform: rotate(-12deg); } to { transform: rotate(-2deg); } }
+.gg[data-mood="working"] .laptop { display: block; }
+.gg .orbit { display: none; transform-origin: 50% 50%; }
+.gg[data-mood="working"] .orbit { display: block; animation: spin 6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* needs you */
+.gg[data-mood="needs"] .whole { animation: hop .9s cubic-bezier(.3, .0, .3, 1) infinite; }
+@keyframes hop { 0%, 100% { transform: translateY(0) scale(1.04, .96); } 40% { transform: translateY(-16px) scale(.97, 1.04); } 70% { transform: translateY(0) scale(1.03, .97); } }
+.gg[data-mood="needs"] .arm.r { transform: rotate(-150deg); }
+.gg[data-mood="needs"] .arm.l { animation: wave .5s ease-in-out infinite alternate; }
+@keyframes wave { from { transform: rotate(130deg); } to { transform: rotate(165deg); } }
+.gg[data-mood="needs"] .sign, .gg[data-mood="needs"] .alert-mark { display: block; }
+.gg[data-mood="needs"] .dish { transform: rotate(0); }
+.gg[data-mood="needs"] .dish-face { animation: scan .5s linear infinite; }
+
+/* finished */
+.gg[data-mood="finished"] .whole { animation: bounce 1.2s ease-in-out infinite; }
+@keyframes bounce { 50% { transform: translateY(-8px) rotate(2deg); } }
+.gg[data-mood="finished"] .arm.l { transform: rotate(140deg); }
+.gg[data-mood="finished"] .arm.r { transform: rotate(-140deg); }
+.gg[data-mood="finished"] .sparkle { display: block; }
+.gg[data-mood="finished"] .cheek { opacity: .75; }
+
+/* failed */
+.gg[data-mood="failed"] .whole { animation: wobble 1.6s ease-in-out infinite; }
+@keyframes wobble { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+.gg[data-mood="failed"] .eyes-dizzy .spiral { animation: spin 1.2s linear infinite; transform-origin: 50% 50%; }
+.gg[data-mood="failed"] .dish { transform: rotate(38deg) translateY(2px); }
+.gg[data-mood="failed"] .arm.l { transform: rotate(-20deg); }
+.gg[data-mood="failed"] .arm.r { transform: rotate(20deg); }
+.gg[data-mood="failed"] .bandage { display: block; }
+
+/* recording */
+.gg[data-mood="recording"] .headphones, .gg[data-mood="recording"] .shh { display: block; }
+.gg[data-mood="recording"] .arm.r { transform: rotate(-118deg); }
+.gg[data-mood="recording"] .whole { animation: sway 3s ease-in-out infinite; }
+@keyframes sway { 50% { transform: rotate(2deg); } }
+
+/* tap */
+.gg.boop .whole { animation: squish .5s cubic-bezier(.3, 1.6, .5, 1) 1 !important; }
+@keyframes squish { 0% { transform: scale(1); } 30% { transform: scale(1.12, .86); } 60% { transform: scale(.94, 1.08); } 100% { transform: scale(1); } }
+
+/* burn-in drift while asleep */
+.screen[data-mood="sleep"] .drift { animation: drift 60s ease-in-out infinite; }
+@keyframes drift { 25% { transform: translate(6%, -4%); } 50% { transform: translate(-4%, 3%); } 75% { transform: translate(3%, 5%); } }
+
+
+
+@media (prefers-reduced-motion: reduce) { .gg *, .gg .whole, .drift, .z, .puff, .mini i, .bubble { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="screen" id="screen" data-mood="sleep">
+  <div class="topbar"><span class="live" id="live">Live</span><span class="rec">● REC</span><span class="tally" id="tally"></span></div>
+  <div class="gogo-zone">
+    <div class="drift">
+      <button id="gogoBtn" aria-label="Tap GoGo">
+        <svg viewBox="0 0 240 268" class="gg" id="gogo" data-mood="working" aria-hidden="true">
+              <defs>
+                <linearGradient id="shell" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#f7f9fd"/><stop offset="1" stop-color="#cdd6e7"/>
+                </linearGradient>
+                <radialGradient id="visorGlow" cx=".5" cy=".35" r=".8">
+                  <stop offset="0" stop-color="#1d2740"/><stop offset="1" stop-color="#0e131f"/>
+                </radialGradient>
+              </defs>
+
+              <!-- orbiting chat dots (working) -->
+              <g class="orbit">
+                <circle cx="120" cy="138" r="112" fill="none" stroke="#5aa8ff" stroke-opacity=".18" stroke-dasharray="3 9"/>
+                <circle cx="232" cy="138" r="7" fill="#5aa8ff"/>
+                <circle cx="8" cy="138" r="7" fill="#5aa8ff"/>
+                <circle cx="120" cy="26" r="7" fill="#5aa8ff"/>
+              </g>
+
+              <g class="whole">
+                <!-- shadow -->
+                <ellipse cx="120" cy="258" rx="62" ry="7" fill="#000" opacity=".35"/>
+
+                <!-- antenna + radar dish -->
+                <g class="dish">
+                  <rect x="117" y="38" width="6" height="30" rx="3" fill="#9fb0cc"/>
+                  <g class="dish-face">
+                    <path d="M92 30 Q120 58 148 30 Q120 40 92 30 Z" fill="#e8edf6" stroke="#a9b6cf" stroke-width="2"/>
+                    <circle cx="120" cy="26" r="6" style="fill:var(--mood)"/>
+                    <circle cx="120" cy="26" r="11" style="fill:var(--mood)" opacity=".25"/>
+                  </g>
+                </g>
+
+                <!-- night cap -->
+                <g class="extra nightcap">
+                  <path d="M70 84 Q96 22 168 40 Q150 60 170 84 Z" fill="#6b74e8"/>
+                  <path d="M66 84 Q120 70 174 84 L172 94 Q120 82 68 94 Z" fill="#f2f4ff"/>
+                  <circle cx="172" cy="38" r="10" fill="#f2f4ff"/>
+                </g>
+
+                <!-- arms (behind body) -->
+                <g class="arm l"><rect x="34" y="150" width="30" height="62" rx="15" fill="url(#shell)" stroke="#b6c2d8" stroke-width="2"/></g>
+                <g class="arm r"><rect x="176" y="150" width="30" height="62" rx="15" fill="url(#shell)" stroke="#b6c2d8" stroke-width="2"/></g>
+
+                <!-- feet -->
+                <rect x="78" y="236" width="34" height="20" rx="10" fill="#aebcd3"/>
+                <rect x="128" y="236" width="34" height="20" rx="10" fill="#aebcd3"/>
+
+                <!-- body -->
+                <rect x="52" y="62" width="136" height="184" rx="64" fill="url(#shell)" stroke="#b6c2d8" stroke-width="2"/>
+                <ellipse cx="96" cy="96" rx="22" ry="10" fill="#fff" opacity=".55"/>
+
+                <!-- face screen -->
+                <rect x="68" y="88" width="104" height="76" rx="30" fill="url(#visorGlow)"/>
+                <rect x="68" y="88" width="104" height="76" rx="30" fill="none" style="stroke:var(--mood)" stroke-opacity=".35" stroke-width="2"/>
+
+                <g class="eyes-x">
+                  <!-- sleep: closed arcs -->
+                  <g class="eye-set eyes-sleep" fill="none" stroke="#b9c0ff" stroke-width="5" stroke-linecap="round">
+                    <path d="M90 126 q10 7 20 0"/><path d="M130 126 q10 7 20 0"/>
+                  </g>
+                  <!-- focus: narrowed bars -->
+                  <g class="eye-set eyes-focus" style="fill:var(--working)">
+                    <rect class="blinkable" x="88" y="116" width="22" height="13" rx="6.5"/>
+                    <rect class="blinkable" x="130" y="116" width="22" height="13" rx="6.5"/>
+                  </g>
+                  <!-- wide: big round eyes -->
+                  <g class="eye-set eyes-wide">
+                    <circle class="blinkable" cx="99" cy="122" r="13" style="fill:var(--needs)"/>
+                    <circle class="blinkable" cx="141" cy="122" r="13" style="fill:var(--needs)"/>
+                    <circle cx="104" cy="117" r="4" fill="#fff"/><circle cx="146" cy="117" r="4" fill="#fff"/>
+                  </g>
+                  <!-- happy: ^ ^ -->
+                  <g class="eye-set eyes-happy" fill="none" style="stroke:var(--finished)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M88 128 l11 -12 l11 12"/><path d="M130 128 l11 -12 l11 12"/>
+                  </g>
+                  <!-- dizzy: spirals -->
+                  <g class="eye-set eyes-dizzy" fill="none" style="stroke:var(--failed)" stroke-width="4" stroke-linecap="round">
+                    <path class="spiral" d="M99 122 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0 a11 11 0 1 1 -22 0"/>
+                    <path class="spiral" d="M141 122 m-2 0 a2 2 0 1 1 4 0 a5 5 0 1 1 -10 0 a8 8 0 1 1 16 0 a11 11 0 1 1 -22 0"/>
+                  </g>
+                  <!-- calm: content closed eyes (recording) -->
+                  <g class="eye-set eyes-calm" fill="none" style="stroke:var(--rec)" stroke-width="5" stroke-linecap="round">
+                    <path d="M90 124 q10 -8 20 0"/><path d="M130 124 q10 -8 20 0"/>
+                  </g>
+                </g>
+
+                <!-- cheeks -->
+                <ellipse class="cheek" cx="84" cy="146" rx="9" ry="5" fill="#ff8fb0" opacity=".45"/>
+                <ellipse class="cheek" cx="156" cy="146" rx="9" ry="5" fill="#ff8fb0" opacity=".45"/>
+
+                <!-- status light on the tummy -->
+                <circle class="status-light" cx="120" cy="196" r="9" style="fill:var(--mood)"/>
+                <circle cx="120" cy="196" r="16" style="fill:var(--mood)" opacity=".18"/>
+
+                <!-- laptop (working) -->
+                <g class="extra laptop">
+                  <path d="M74 214 L166 214 L176 234 L64 234 Z" fill="#2a3552"/>
+                  <rect x="80" y="178" width="80" height="38" rx="5" fill="#33405f"/>
+                  <circle cx="120" cy="197" r="4" fill="#9fb0cc"/>
+                </g>
+
+                <!-- sign (needs you) -->
+                <g class="extra sign">
+                  <rect x="150" y="6" width="84" height="52" rx="12" fill="#fff4dc" style="stroke:var(--needs)" stroke-width="4"/>
+                  <text x="192" y="40" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="22" fill="#8a5a00">HEY!</text>
+                  <rect x="186" y="56" width="6" height="40" rx="3" fill="#c79a4a"/>
+                </g>
+                <g class="extra alert-mark">
+                  <text x="40" y="70" font-family="Fredoka, sans-serif" font-weight="700" font-size="34" style="fill:var(--needs)">!</text>
+                </g>
+
+                <!-- sparkles (finished) -->
+                <g class="extra sparkle" style="fill:var(--finished)">
+                  <path d="M30 70 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 l10 -4 Z"/>
+                  <path d="M206 58 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 l8 -3 Z"/>
+                  <path d="M214 150 l3 7 l7 3 l-7 3 l-3 7 l-3 -7 l-7 -3 l7 -3 Z" opacity=".7"/>
+                </g>
+
+                <!-- bandage (failed) -->
+                <g class="extra bandage">
+                  <path d="M132 76 L170 64 Q175 63 176 68 L178 74 Q179 79 174 80 L136 92 Q131 93 130 88 L128 82 Q127 77 132 76 Z" fill="#ffd2a8"/>
+                  <circle cx="150" cy="77" r="1.8" fill="#c08a5c"/><circle cx="158" cy="75" r="1.8" fill="#c08a5c"/>
+                </g>
+
+                <!-- headphones + shh (recording) -->
+                <g class="extra headphones">
+                  <path d="M50 120 Q50 40 120 40 Q190 40 190 120" fill="none" stroke="#2c3550" stroke-width="10" stroke-linecap="round"/>
+                  <rect x="36" y="104" width="24" height="44" rx="10" style="fill:var(--rec)"/>
+                  <rect x="180" y="104" width="24" height="44" rx="10" style="fill:var(--rec)"/>
+                </g>
+                <g class="extra shh">
+                  <circle cx="120" cy="152" r="6" fill="#ff8fb0"/>
+                  <text x="196" y="186" font-family="Fredoka, sans-serif" font-weight="700" font-size="18" style="fill:var(--rec)">shh</text>
+                </g>
+              </g>
+            </svg>
+      </button>
+    </div>
+    <div class="fx" id="fx"></div>
+    <div class="ears"></div>
+    <div class="say" id="say" hidden></div>
+  </div>
+  <div class="card-zone" id="cards"></div>
+</div>
+<canvas id="confetti"></canvas>
+<div class="dock" id="dock">
+  <button class="chip" data-say="Hi GoGo!">👋 Hi</button>
+  <button class="chip" data-say="Who are you?">Who are you?</button>
+  <button class="chip" data-say="What's up?">What's up?</button>
+  <button class="chip" data-say="Tell me a joke">Joke</button>
+  <button class="round mic" id="micBtn" aria-label="Talk to GoGo">🎤</button>
+  <button class="round" id="kbdBtn" aria-label="Type to GoGo">⌨</button>
+  <span class="spacer"></span>
+  <button class="handle" id="handle">All chats</button>
+</div>
+<form class="ask" id="ask"><input id="askInput" autocomplete="off" placeholder="Say something to GoGo…" maxlength="140"><button>Send</button></form>
+<div class="scrim" id="scrim"></div>
+<section class="sheet" id="sheet" aria-label="All chats">
+  <header><div class="sheet-head"><h2>All chats <small id="sheetCount"></small></h2><button class="more act" id="allRead" data-act="all" hidden>Mark all read</button></div></header>
+  <div class="list" id="list"></div>
+</section>
+
+<script>
+(() => {
+  const A = window.Android || (window.parent !== window && window.parent.RadarBridge) || { seen(){}, open(){}, seenAll(){}, remove(){}, boop(){}, ready(){}, speak(){}, listen(){}, setRecording(){} };
+  const $ = id => document.getElementById(id);
+  const screen = $('screen'), gogo = $('gogo'), cards = $('cards'), fx = $('fx');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const C = {
+    sleep:     ['#7c86ff', 'rgba(124,134,255,.26)', '#e6e8ff', '#3a3f8a'],
+    working:   ['#5aa8ff', 'rgba(90,168,255,.30)',  '#dcecff', '#1d4f8c'],
+    needs:     ['#ffb21e', 'rgba(255,178,30,.34)',  '#fff0d0', '#8a5a00'],
+    finished:  ['#3ee0a0', 'rgba(62,224,160,.30)',  '#d6f8ea', '#0f6b47'],
+    failed:    ['#ff5d62', 'rgba(255,93,98,.32)',   '#ffe0e1', '#9a1f24'],
+    recording: ['#ff6fa8', 'rgba(255,111,168,.28)', '#ffe0ec', '#9a2456'],
+  };
+  const dot = { working: 'var(--working)', needs_you: 'var(--needs)', finished: 'var(--finished)', failed: 'var(--failed)' };
+  let state = { sessions: [], connected: true, recording: false };
+  let mood = null, lastKey = '', shown = null;
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const title = s => s.title || s.project || 'Claude chat';
+  const ago = iso => {
+    const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+  };
+  const where = s => s.machine || (s.source === 'cloud' ? 'Cloud' : '');
+  const unseen = s => !s.seen_at;
+
+  function moodOf(list, rec) {
+    if (rec) return 'recording';
+    if (list.some(s => unseen(s) && s.status === 'needs_you')) return 'needs';
+    if (list.some(s => unseen(s) && s.status === 'failed')) return 'failed';
+    if (list.some(s => unseen(s) && s.status === 'finished')) return 'finished';
+    if (list.some(s => s.status === 'working')) return 'working';
+    return 'sleep';
+  }
+
+  function bubble(s, tag) {
+    return `<div class="bubble" data-id="${esc(s.session_id)}"><span class="tag">● ${tag}</span><h3>${esc(title(s))}</h3>
+      ${s.message ? `<p>${esc(s.message)}</p>` : ''}<div class="meta">${esc([where(s), ago(s.updated_at)].filter(Boolean).join(' · '))} · ${s.url ? 'tap: read · double-tap: open' : 'tap to mark read'}</div></div>`;
+  }
+  function minis(list, cls) {
+    return `<div class="minis">${list.slice(0, 4).map(s => `<div class="mini" data-id="${esc(s.session_id)}"><i class="${cls(s)}"></i><span>${esc(title(s))}</span><small>${esc(where(s))}</small></div>`).join('')}
+      ${list.length > 4 ? `<div class="more">+${list.length - 4} more</div>` : ''}</div>`;
+  }
+
+  function renderCards() {
+    const list = state.sessions;
+    const alerts = list.filter(s => unseen(s) && s.status !== 'working');
+    const newest = st => list.filter(s => unseen(s) && s.status === st)[0];
+    let html = '';
+    shown = mood === 'needs' ? newest('needs_you') : mood === 'failed' ? newest('failed') : mood === 'finished' ? newest('finished') : null;
+    if (mood === 'needs') html = bubble(newest('needs_you'), 'Needs you');
+    else if (mood === 'failed') html = bubble(newest('failed'), 'Failed');
+    else if (mood === 'finished') html = bubble(newest('finished'), 'Finished');
+    else if (mood === 'working') html = minis(list.filter(s => s.status === 'working'), () => '');
+    else if (mood === 'recording') html = alerts.length
+      ? `<div class="quiet">Recording<small>${alerts.length} alert${alerts.length > 1 ? 's' : ''} waiting · shown when you stop</small></div>` + minis(alerts, s => s.status === 'needs_you' ? 'need' : s.status === 'failed' ? 'fail' : 'done')
+      : `<div class="quiet">Recording<small>GoGo stays quiet until you stop.</small></div>`;
+    else {
+      const last = list[0];
+      html = `<div class="quiet">All quiet<small>${last ? `Last: ${esc(title(last))} · ${ago(last.updated_at)}` : 'Start a Claude chat and GoGo will wake up.'}</small></div>`;
+    }
+    if (['needs', 'failed', 'finished'].includes(mood) && alerts.length > 1) html += `<div class="chips"><div class="more">+${alerts.length - 1} more waiting · swipe up</div><button class="more act" data-act="all">Mark all read</button></div>`;
+    cards.innerHTML = html;
+  }
+
+  function renderOrbit() {
+    const g = gogo.querySelector('.orbit');
+    const n = Math.min(state.sessions.filter(s => s.status === 'working').length, 6);
+    let dots = '<circle cx="120" cy="138" r="112" fill="none" stroke="#5aa8ff" stroke-opacity=".18" stroke-dasharray="3 9"/>';
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2 - Math.PI / 2; dots += `<circle cx="${(120 + 112 * Math.cos(a)).toFixed(1)}" cy="${(138 + 112 * Math.sin(a)).toFixed(1)}" r="7" fill="#5aa8ff"/>`; }
+    g.innerHTML = dots;
+  }
+
+  function renderSheet() {
+    const list = state.sessions;
+    $('handle').textContent = list.length ? `All chats · ${list.length}` : 'All chats';
+    $('sheetCount').textContent = list.length ? `${list.length} · tap: read · double-tap: open · hold: remove` : '';
+    $('allRead').hidden = !list.some(s => unseen(s) && s.status !== 'working');
+    $('list').innerHTML = list.length ? list.map(s => `<div class="row ${unseen(s) && s.status !== 'working' ? 'unseen' : ''}" data-id="${esc(s.session_id)}">
+      <i style="background:${unseen(s) || s.status === 'working' ? dot[s.status] : '#8e9ab3'}"></i><b>${esc(title(s))}</b>
+      <div class="sub">${esc([{ working: 'Working', needs_you: 'Needs you', finished: unseen(s) ? 'Finished' : 'Done', failed: 'Failed' }[s.status], where(s), ago(s.updated_at)].filter(Boolean).join(' · '))}</div>
+      ${s.message ? `<div class="msg">${esc(s.message)}</div>` : ''}</div>`).join('') : '<div class="empty">No chats yet.</div>';
+  }
+
+  function renderTally() {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const t = state.sessions.filter(s => Date.parse(s.updated_at) >= today.getTime());
+    const f = t.filter(s => s.status === 'finished').length, n = t.filter(s => s.status === 'needs_you').length, w = state.sessions.filter(s => s.status === 'working').length;
+    const bits = [f && `${f} finished`, n && `${n} need you`, w && `${w} working`].filter(Boolean);
+    $('tally').textContent = bits.length ? ['Today', ...bits].join(' · ') : '';
+  }
+
+  function setMood(m) {
+    const changed = m !== mood; mood = m;
+    gogo.dataset.mood = m; screen.dataset.mood = m;
+    const [c, glow, tb, tf] = C[m];
+    const r = document.documentElement.style;
+    r.setProperty('--mood', c); r.setProperty('--glow', glow); r.setProperty('--tagbg', tb); r.setProperty('--tagfg', tf);
+    document.body.classList.toggle('recording', m === 'recording');
+    const h = new Date().getHours();
+    screen.classList.toggle('night', m === 'sleep' && (h >= 22 || h < 7));
+    if (changed) {
+      fx.innerHTML = ''; stopConfetti();
+      if (m === 'sleep') addZ();
+      if (m === 'failed') addPuffs();
+      if (m === 'finished') confetti();
+    }
+  }
+
+  function render() {
+    setMood(moodOf(state.sessions, state.recording));
+    $('live').textContent = state.connected ? 'Live' : 'Reconnecting…';
+    $('live').classList.toggle('off', !state.connected);
+    screen.classList.toggle('offline', !state.connected);
+    renderCards(); renderOrbit(); renderSheet(); renderTally(); if (typeof moments === 'function') moments();
+  }
+
+  function addZ() {
+    if (reduce) return;
+    [0, 1.2, 2.4].forEach((d, i) => { const z = document.createElement('span'); z.className = 'z'; z.textContent = 'z';
+      z.style.cssText = `left:${58 + i * 4}%;top:${30 - i * 3}%;font-size:${18 + i * 7}px;animation-delay:${d}s`; fx.appendChild(z); });
+  }
+  function addPuffs() {
+    if (reduce) return;
+    [0, .8, 1.6].forEach((d, i) => { const p = document.createElement('span'); p.className = 'puff';
+      p.style.cssText = `left:${44 + i * 6}%;top:22%;animation-delay:${d}s;--dx:${(i - 1) * 16}px`; fx.appendChild(p); });
+  }
+
+  const cv = $('confetti'), c2 = cv.getContext('2d');
+  let parts = [], raf = 0;
+  function stopConfetti() { cancelAnimationFrame(raf); parts = []; c2.clearRect(0, 0, cv.width, cv.height); }
+  function confetti() {
+    if (reduce) return;
+    const dpr = devicePixelRatio || 1; cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    const pal = ['#3ee0a0', '#ffb21e', '#5aa8ff', '#ff6fa8', '#ffffff'];
+    const portrait = document.body.classList.contains('portrait');
+    const ox = cv.width * (portrait ? .5 : .27), oy = cv.height * (portrait ? .25 : .35);
+    parts = Array.from({ length: 110 }, () => ({ x: ox, y: oy, vx: (Math.random() - .5) * 10 * dpr, vy: (-Math.random() * 10 - 3) * dpr,
+      s: (4 + Math.random() * 5) * dpr, r: Math.random() * 6, vr: (Math.random() - .5) * .3, c: pal[(Math.random() * pal.length) | 0], life: 1 }));
+    cancelAnimationFrame(raf); step();
+  }
+  function step() {
+    const dpr = devicePixelRatio || 1; c2.clearRect(0, 0, cv.width, cv.height);
+    parts.forEach(p => { p.vy += .25 * dpr; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= .007;
+      c2.save(); c2.globalAlpha = Math.max(p.life, 0); c2.translate(p.x, p.y); c2.rotate(p.r); c2.fillStyle = p.c; c2.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); c2.restore(); });
+    parts = parts.filter(p => p.life > 0 && p.y < cv.height + 20);
+    if (parts.length) raf = requestAnimationFrame(step); else c2.clearRect(0, 0, cv.width, cv.height);
+  }
+
+  // blinking + occasional glance while idle
+  setInterval(() => { if (['working', 'needs'].includes(mood) && !reduce) { gogo.classList.add('blink'); setTimeout(() => gogo.classList.remove('blink'), 140); } }, 2700);
+
+  // tap GoGo
+  $('gogoBtn').addEventListener('click', () => {
+    gogo.classList.remove('boop'); void gogo.getBBox(); gogo.classList.add('boop'); A.boop();
+    if (shown) A.seen(shown.session_id);
+    else if (typeof say === 'function' && Math.random() < .5) say(pick(['Boop! 💙', 'Hehe, that tickles!', 'Beep beep! 📡', '*happy wiggle*']), { speak: false });
+    setTimeout(() => gogo.classList.remove('boop'), 900);
+  });
+
+  // taps on cards and rows; hold to remove
+  let holdTimer = 0, held = false;
+  function bindTaps(el) {
+    el.addEventListener('pointerdown', e => { const t = e.target.closest('[data-id]'); if (!t) return; held = false;
+      holdTimer = setTimeout(() => { held = true; if (navigator.vibrate) navigator.vibrate(20); A.remove(t.dataset.id); }, 650); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, () => clearTimeout(holdTimer)));
+    let pending = null;
+    el.addEventListener('click', e => {
+      if (e.target.closest('[data-act="all"]')) { A.seenAll(); return; }
+      const t = e.target.closest('[data-id]'); if (!t || held) return;
+      const id = t.dataset.id;
+      if (pending && pending.id === id) { clearTimeout(pending.timer); pending = null; t.classList.add('tapped'); A.open(id); return; }
+      if (pending) { clearTimeout(pending.timer); A.seen(pending.id); }
+      pending = { id, timer: setTimeout(() => { pending = null; A.seen(id); }, 280) };
+    });
+  }
+  bindTaps(cards); bindTaps($('list'));
+  $('allRead').addEventListener('click', () => A.seenAll());
+
+  // sheet: tap handle or swipe up anywhere; swipe down or tap outside to close
+  const sheet = $('sheet'), scrim = $('scrim');
+  const openSheet = o => { sheet.classList.toggle('open', o); scrim.classList.toggle('open', o); };
+  $('handle').addEventListener('click', () => openSheet(true));
+  scrim.addEventListener('click', () => openSheet(false));
+  let y0 = null;
+  addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
+  addEventListener('touchend', e => {
+    if (y0 == null) return; const dy = e.changedTouches[0].clientY - y0; y0 = null;
+    const open = sheet.classList.contains('open');
+    if (!open && dy < -60) openSheet(true);
+    else if (open && dy > 80 && $('list').scrollTop <= 0) openSheet(false);
+  }, { passive: true });
+
+  function sizeGoGo() {
+    const z = document.querySelector('.gogo-zone'), btn = $('gogoBtn');
+    const w = z.clientWidth, h = z.clientHeight - 30;
+    if (!w || !h) return;
+    const W = Math.max(80, Math.min(w * (document.body.classList.contains('portrait') ? 0.64 : 0.78), (h * 0.9) * 240 / 268));
+    btn.style.width = W + 'px'; btn.style.height = (W * 268 / 240) + 'px';
+  }
+  function layout() { document.body.classList.toggle('portrait', innerHeight > innerWidth); sizeGoGo(); }
+  addEventListener('resize', layout); layout(); setTimeout(layout, 300);
+  setInterval(render, 30000); // refresh "x min ago" and night mode
+
+
+  // ================= GoGo talks =================
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const sayEl = $('say');
+  let sayTimer = 0, lastChatter = Date.now();
+  function say(text, { speak = true, you = false, sticky = false } = {}) {
+    clearTimeout(sayTimer);
+    sayEl.className = 'say' + (you ? ' you' : ''); sayEl.innerHTML = text; sayEl.hidden = false;
+    void sayEl.offsetWidth; sayEl.style.animation = 'none'; void sayEl.offsetWidth; sayEl.style.animation = '';
+    if (speak && !you) A.speak(sayEl.textContent);
+    if (!sticky) sayTimer = setTimeout(() => { sayEl.hidden = true; }, 3500 + text.length * 55);
+    lastChatter = Date.now();
+  }
+  function wiggle(kind) {
+    gogo.classList.remove('boop'); void gogo.getBBox(); gogo.classList.add('boop');
+    setTimeout(() => gogo.classList.remove('boop'), 900);
+    if (kind === 'party') confetti();
+  }
+  const name = s => esc(title(s));
+  function counts() {
+    const L = state.sessions, u = st => L.filter(s => unseen(s) && s.status === st);
+    return { need: u('needs_you'), done: u('finished'), fail: u('failed'), work: L.filter(s => s.status === 'working') };
+  }
+  function statusLine() {
+    const c = counts(), bits = [];
+    if (c.need.length) bits.push(`${c.need.length} need${c.need.length > 1 ? '' : 's'} you`);
+    if (c.fail.length) bits.push(`${c.fail.length} failed`);
+    if (c.done.length) bits.push(`${c.done.length} finished`);
+    if (c.work.length) bits.push(`${c.work.length} cooking`);
+    if (!bits.length) return pick(["All quiet on the radar! Nothing needs you right now. 😌", "Zero alerts, zero worries. Want a joke while we wait?", "Nothing's beeping. Enjoy the calm! ☕"]);
+    let line = `Radar report: ${bits.join(', ')}.`;
+    if (c.need.length) line += ` Newest: “${name(c.need[0])}” is waiting for you!`;
+    else if (c.fail.length) line += ` “${name(c.fail[0])}” hit a bump.`;
+    else if (c.done.length) line += ` “${name(c.done[0])}” is ready! 🎉`;
+    return line;
+  }
+  const jokes = [
+    "Why did the podcast mic blush? It saw the pop filter! 🎙️",
+    "What's a robot's favourite podcast? The Byte Show! 🤖",
+    "Why don't radars ever get lost? They always pick up the signal! 📡",
+    "I tried to edit a podcast once… I cut so much ‘um’ there was nothing left. 😅",
+    "Why was the audio file so calm? It had great compression! 🎚️",
+    "What do you call a sleepy robot? A nap-top! 💤",
+  ];
+  const intents = [
+    [/who are you|what are you|your name|introduce/, () => { wiggle(); return "I'm GoGo! 📡 A tiny radar bot who keeps an eye on your Claude chats, so you don't have to. I hop when one needs you and throw confetti when one's done!"; }],
+    [/how are you|how('?| a)re you|you ok|how do you feel/, () => {
+      const m = { needs: "A little jumpy! Someone needs you! 😳", failed: "Bit dizzy… a chat tripped over. 😵", finished: "Super happy! Something just finished! 🥳",
+        working: "Busy busy! Watching my chats cook. 🍳", recording: "Very quiet, very professional. 🤫", sleep: "Cozy and calm! 😌" };
+      return m[mood] || "Great! Thanks for asking! 💙";
+    }],
+    [/what('?s| is) up|status|update|news|report|how many|going on|anything new|what('?s| is) happening/, statusLine],
+    [/need(s)? me|waiting|my turn|anything for me/, () => {
+      const c = counts();
+      return c.need.length ? `Yes! ${c.need.map(s => `“${name(s)}”`).slice(0, 3).join(', ')} ${c.need.length > 1 ? 'need' : 'needs'} you! Double-tap the card to open it.` : "Nope! Nothing needs you right now. Go grab a coffee! ☕";
+    }],
+    [/finished|done|ready|complete/, () => {
+      const c = counts();
+      return c.done.length ? `${c.done.length} finished: ${c.done.map(s => `“${name(s)}”`).slice(0, 3).join(', ')}! 🎉` : "Nothing new has finished yet. I'll throw confetti when it does!";
+    }],
+    [/joke|funny|laugh|make me smile/, () => { wiggle(); return pick(jokes); }],
+    [/thank|thanks|good (girl|job|bot)|well done|nice/, () => { wiggle(); return pick(["Aww! 🥹 Anytime!", "*happy beeps* You're welcome!", "That made my antenna wiggle! 💙"]); }],
+    [/love you|cute|adorable|pretty|best/, () => { wiggle(); return pick(["Stop it, my antenna is blushing! 😳💗", "You're the best producer on my radar! 💙", "Eeee! 💗 *spins dish happily*"]); }],
+    [/sing|dance|party|celebrate/, () => { wiggle('party'); return "🎶 Beep boop, la la loop, every chat is in the group! 🎶"; }],
+    [/\b(what time|the time|clock)\b/, () => `It's ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}! ⏰`],
+    [/clear|mark (all )?(as )?read|all read|dismiss/, () => { A.seenAll(); wiggle(); return "All clean! ✨ Radar is sparkly."; }],
+    [/\b(recording mode|start recording|we('?re| are) recording|i('?m| am) recording)\b/, () => { A.setRecording(true); return "Shh mode on! 🤫 My ears and voice are off until you stop recording."; }],
+    [/(good ?night|bye|see you|sleep|nap)/, () => pick(["Nighty night! 🌙 I'll keep one eye on the radar.", "Bye bye! 👋 Come back soon!", "Sweet dreams! 💤"])],
+    [/help|what can you do|commands/, () => "Try: “What's up?”, “Anything need me?”, “What's finished?”, “Clear all”, “Tell me a joke”, or just say hi! 💙"],
+    [/\b(hi|hello|hey|hiya|yo|salam|marhaba|ahlan|morning|evening)\b/, () => {
+      const h = new Date().getHours();
+      const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      wiggle(); return pick([`Hiii! 👋 ${greet}! GoGo here, antenna fully charged!`, `Hey hey! 💙 ${greet}! Ready to watch your chats!`, `Oh hi! *happy beep* ${greet}!`]);
+    }],
+    [/^(yes|yeah|yep|ok(ay)?|sure|cool)\b/, () => pick(["Yay! 🎉", "Okie dokie! 💙", "Beep beep, got it!"])],
+    [/^(no|nope|nah)\b/, () => pick(["Okay okay! 🙈", "No worries!", "Fair enough! 😄"])],
+  ];
+  function reply(text) {
+    const t = (text || '').toLowerCase().replace(/go ?go/g, '').trim();
+    if (!t) return pick(["Hmm? My antenna didn't catch that. Try again? 👂", "Say that again? I was busy spinning my dish! 📡"]);
+    for (const [re, fn] of intents) if (re.test(t)) return fn();
+    return pick(["Hmm, that one's above my antenna! 🤔 Try “What's up?” or “Tell me a joke”.",
+      "Ooh, I don't know that yet! I'm a tiny robot. 🤖 Ask me what's up?",
+      "Beep? 🙃 I only know a few things. Say “help” to see them!"]);
+  }
+  function talk(text, { heard = false } = {}) {
+    if (text) say(esc(text), { you: true });
+    setTimeout(() => say(reply(text)), text ? 700 : 0);
+  }
+
+  // dock: chips, mic, keyboard
+  $('dock').addEventListener('click', e => {
+    const c = e.target.closest('[data-say]'); if (c) talk(c.dataset.say);
+  });
+  $('micBtn').addEventListener('click', () => A.listen());
+  $('kbdBtn').addEventListener('click', () => { $('ask').classList.toggle('open'); if ($('ask').classList.contains('open')) $('askInput').focus(); });
+  $('ask').addEventListener('submit', e => { e.preventDefault(); const v = $('askInput').value.trim(); $('askInput').value = ''; $('ask').classList.remove('open'); $('askInput').blur(); if (v) talk(v); });
+
+  // little moments on her own (text only, no voice, so she doesn't chatter out loud)
+  let prevMood = null;
+  function moments() {
+    if (prevMood && mood !== prevMood) {
+      const c = counts();
+      if (mood === 'finished' && c.done[0]) say(pick([`Ta-da! “${name(c.done[0])}” is done! 🎉`, `Woohoo! “${name(c.done[0])}” finished! 🥳`]), { speak: false });
+      if (mood === 'needs' && c.need[0]) say(pick([`Psst! “${name(c.need[0])}” needs you! 👀`, `Hey hey! “${name(c.need[0])}” is waiting! 🙋‍♀️`]), { speak: false });
+      if (mood === 'failed' && c.fail[0]) say(`Uh oh… “${name(c.fail[0])}” tripped. 😵`, { speak: false });
+      if (mood === 'working' && prevMood === 'sleep') say(pick(["Ooh, work time! 💪", "Yawn… I'm up, I'm up! 📡"]), { speak: false });
+    }
+    prevMood = mood;
+  }
+  setInterval(() => {
+    if (Date.now() - lastChatter < 25 * 60000 || !sayEl.hidden || mood === 'recording') return;
+    const h = new Date().getHours();
+    say(pick([
+      mood === 'sleep' ? "*soft snore* … 💤" : "Still watching! 📡",
+      h < 11 ? "Morning! Coffee first, then podcasts. ☕" : h > 20 ? "It's getting late… don't forget to rest! 🌙" : "Stretch break? Your back will thank you! 🙆",
+      "Tap me anytime! I like boops. 💙",
+    ]), { speak: false });
+  }, 60000);
+  setTimeout(() => {
+    const h = new Date().getHours();
+    say(`${h < 12 ? 'Good morning' : h < 18 ? 'Hi there' : 'Good evening'}! 💙 GoGo's on duty.`, { speak: false });
+  }, 1200);
+
+  window.gogo = {
+    update(s) {
+      state = s; const key = JSON.stringify(s);
+      if (key !== lastKey) { lastKey = key; render(); }
+    },
+    celebrate() { if (mood === 'finished') confetti(); },
+    say(text) { say(esc(text)); },
+    wake() { say(pick(["Yes? 👂", "I'm listening! 👂", "Hiii? 👂"]), { sticky: true, speak: false }); },
+    heard(text) { if (text) talk(text, { heard: true }); else say("Hmm? I didn't catch that. 👂", { speak: false }); },
+    voice(st, p) {
+      const listening = st === 'listening';
+      gogo.classList.toggle('listening', listening);
+      document.querySelector('.gogo-zone').classList.toggle('listening-on', listening);
+      $('micBtn').classList.toggle('live', listening || st === 'wake');
+      $('micBtn').title = st === 'wake' ? 'Listening for “Hey GoGo”' : '';
+      if (listening && sayEl.hidden) say('<span class="dots"><i></i><i></i><i></i></span>', { sticky: true, speak: false });
+      if (st === 'downloading') say(`Learning to hear… ${Math.round(p * 100)}% 📚`, { sticky: true, speak: false });
+      if (st === 'wake' && sayEl.innerHTML.indexOf('dots') >= 0) sayEl.hidden = true;
+    },
+  };
+  render();
+  A.ready();
+})();
+</script>
+</body>
+</html>

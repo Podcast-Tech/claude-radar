@@ -1,6 +1,7 @@
 // Claude Radar: receives status updates from Claude Code hooks.
 // Auth: x-radar-token header (a per-PC token whose SHA-256 is stored in radar_tokens).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { sendPush } from "./webpush.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -10,11 +11,46 @@ const admin = createClient(
 
 const STATUSES = new Set(["working", "needs_you", "finished", "failed", "ended"]);
 
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-radar-token",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...CORS },
   });
+}
+
+const ALERTS: Record<string, string> = { needs_you: "Needs you", finished: "Finished", failed: "Failed" };
+let vapidJwk: JsonWebKey | null = null;
+
+// iPhone (home-screen web app) notifications via Web Push.
+async function pushToPhones(owner: string, row: Record<string, unknown>) {
+  const { data: subs } = await admin.from("radar_push").select("endpoint, p256dh, auth").eq("owner", owner).eq("muted", false);
+  if (!subs?.length) return;
+  if (!vapidJwk) {
+    const { data } = await admin.from("radar_server_config").select("value").eq("key", "vapid_jwk").maybeSingle();
+    if (!data) return;
+    vapidJwk = JSON.parse(data.value);
+  }
+  const title = String(row.title ?? row.project ?? "Claude chat");
+  const payload = {
+    title: `${ALERTS[String(row.status)]} · ${title}`,
+    body: String(row.message ?? (row.status === "needs_you" ? "Claude is waiting for you" : "Tap to see it")).slice(0, 180),
+    session_id: row.session_id, status: row.status, url: row.url ?? null,
+  };
+  const vapid = { jwk: vapidJwk!, subject: "https://github.com/Podcast-Tech/claude-radar" };
+  await Promise.all(subs.map(async (s) => {
+    try {
+      const code = await sendPush(s, payload, vapid);
+      if (code === 404 || code === 410) await admin.from("radar_push").delete().eq("endpoint", s.endpoint);
+      else if (code < 300) await admin.from("radar_push").update({ last_ok_at: new Date().toISOString() }).eq("endpoint", s.endpoint);
+      else console.warn("push failed", code);
+    } catch (e) { console.warn("push error", e); }
+  }));
 }
 
 async function sha256(text: string) {
@@ -26,8 +62,18 @@ const clip = (v: unknown, n: number) =>
   typeof v === "string" && v.length > 0 ? v.slice(0, n) : null;
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   const token = req.headers.get("x-radar-token") ?? "";
+
+  // Test notification, requested by the signed-in iPhone app.
+  if (!token && req.headers.get("authorization")?.startsWith("Bearer ")) {
+    const jwt = req.headers.get("authorization")!.slice(7);
+    const { data: u } = await admin.auth.getUser(jwt);
+    if (!u?.user) return json({ error: "not signed in" }, 401);
+    await pushToPhones(u.user.id, { session_id: "radar-test", status: "needs_you", title: "Test from GoGo", message: "If you see this, iPhone alerts work! 💙" });
+    return json({ ok: true });
+  }
   if (token.length < 20) return json({ error: "missing token" }, 401);
 
   const { data: tok } = await admin
@@ -61,7 +107,7 @@ Deno.serve(async (req) => {
 
   const { data: existing } = await admin
     .from("radar_sessions")
-    .select("status, updated_at")
+    .select("status, updated_at, title, project, url, message")
     .eq("owner", tok.owner)
     .eq("session_id", sessionId)
     .maybeSingle();
@@ -98,6 +144,16 @@ Deno.serve(async (req) => {
 
   const { error } = await admin.from("radar_sessions").upsert(row, { onConflict: "owner,session_id" });
   if (error) return json({ error: error.message }, 500);
+
+  // Notify phones on a new alert (not on repeats of the same state).
+  const isNew = !existing || existing.status !== status;
+  if (ALERTS[status] && isNew) {
+    const merged = { ...(existing ?? {}), ...row };
+    const job = pushToPhones(tok.owner, merged);
+    // deno-lint-ignore no-explicit-any
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(job); else await job;
+  }
 
   await admin.from("radar_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", tok.id);
   if (Math.random() < 0.02) await admin.rpc("radar_cleanup");
