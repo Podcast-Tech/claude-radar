@@ -1,9 +1,13 @@
 name: Release APK
 
-# Push a tag like v1.0.1 (or run manually) to build a signed APK and publish it as a GitHub Release.
+# Builds a signed APK and publishes it as a GitHub Release when:
+#  - radarVersion in gradle.properties changes on main (the usual way), or
+#  - a tag like v1.0.1 is pushed, or the workflow is run by hand.
 # The phone app checks the latest release and installs it over the old version.
 on:
   push:
+    branches: [main]
+    paths: [gradle.properties, .github/workflows/release.yml]
     tags: ["v*.*.*"]
   workflow_dispatch:
     inputs:
@@ -27,16 +31,25 @@ jobs:
         id: v
         run: |
           V="${{ github.event.inputs.version }}"
-          [ -z "$V" ] && V="${GITHUB_REF_NAME#v}"
+          if [ -z "$V" ]; then
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then V="${GITHUB_REF_NAME#v}"
+            else V=$(grep -E '^radarVersion=' gradle.properties | cut -d= -f2 | tr -d ' \r'); fi
+          fi
           echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Bad version: $V"; exit 1; }
           echo "version=$V" >> "$GITHUB_OUTPUT"
+          if GH_TOKEN="${{ github.token }}" gh release view "v$V" >/dev/null 2>&1; then
+            echo "Release v$V already exists: nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-java@v5
+        if: steps.v.outputs.skip != 'true'
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Restore and check signing key
+        if: steps.v.outputs.skip != 'true'
         env:
           KEYSTORE_B64: ${{ secrets.RADAR_KEYSTORE_BASE64 }}
           RAW_PASSWORD: ${{ secrets.RADAR_KEYSTORE_PASSWORD }}
@@ -54,11 +67,13 @@ jobs:
           echo "Signing key OK"
 
       - name: Build signed APK
+        if: steps.v.outputs.skip != 'true'
         env:
           RADAR_KEYSTORE: ${{ runner.temp }}/release.jks
         run: ./gradlew assembleRelease -PradarVersion=${{ steps.v.outputs.version }} --no-daemon --stacktrace
 
       - name: Check signature
+        if: steps.v.outputs.skip != 'true'
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
@@ -68,10 +83,11 @@ jobs:
           cp "$APK" "claude-radar-${{ steps.v.outputs.version }}.apk"
 
       - name: Publish release
+        if: steps.v.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           V=${{ steps.v.outputs.version }}
           gh release create "v$V" "claude-radar-$V.apk" \
             --title "Claude Radar $V" --generate-notes --latest \
-            $( [ "${{ github.event_name }}" = "push" ] && echo "--verify-tag" )
+            $( [[ "$GITHUB_REF" == refs/tags/* ]] && echo "--verify-tag" || echo "--target $GITHUB_SHA" )
