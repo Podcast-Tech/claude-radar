@@ -1,5 +1,5 @@
 // GoGo for iPhone: notifications + offline shell.
-const CACHE = 'gogo-v1';
+const CACHE = 'gogo-v2';
 const SHELL = ['./', 'index.html', 'app.js', 'manifest.webmanifest', 'vendor/supabase-2.118.0.js',
   'gogo/index.html', 'gogo/fonts.css', 'gogo/fredoka.woff2', 'gogo/nunito.woff2', 'icon-180.png'];
 

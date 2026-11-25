@@ -1,7 +1,7 @@
 // GoGo for iPhone: a home-screen web app. Same GoGo as the Android app (gogo/index.html, in a frame),
 // with an iPhone bridge, Web Push alerts and the phone's own voice.
 (() => {
-  const VERSION = 'iPhone 1.0.0';
+  const VERSION = 'iPhone 1.0.1';
   const SUPABASE_URL = 'https://dkfiyqacjdsvvbrcsabw.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_QYuYaLDjC6862ClbKyhO7w_gDTdHEct'; // publishable: data is protected by login + row-level security
   const VAPID_PUBLIC = 'BMlyNmeNHHIGRYfAEdqMePZaaCbOgfcqYfrFnI5v992MgGG__jNsEoklBHLiyjri40vJeFfFkxJ7dqMvAr01Tkg';
@@ -23,9 +23,11 @@
     get awake() { return store.get('awake', false); }, set awake(v) { store.set('awake', v); },
   };
 
-  let sessions = [], connected = false, loadedOnce = false, user = null, channel = null, reg = null;
+  let sessions = [], rtUp = false, lastOk = 0, loadedOnce = false, user = null, channel = null, reg = null;
   const frame = $('frame');
-  const G = () => frame.contentWindow && frame.contentWindow.gogo;
+  // "Live" = data is arriving: either realtime is up, or the last check worked recently.
+  const isLive = () => rtUp || Date.now() - lastOk < 45000;
+  const G = () => { const g = frame.contentWindow && frame.contentWindow.gogo; return g && typeof g.update === 'function' ? g : null; }; // while the page loads, window.gogo is still the robot's SVG element
 
   function toast(html, ms = 3500) {
     const t = $('toast'); t.innerHTML = html; t.hidden = false;
@@ -35,7 +37,7 @@
 
   // ---------- data ----------
   function push() {
-    const g = G(); if (g) g.update({ sessions, connected, recording: prefs.recording });
+    const g = G(); if (g) g.update({ sessions, connected: isLive(), recording: prefs.recording });
     const n = sessions.filter(s => !s.seen_at && ['needs_you', 'finished', 'failed'].includes(s.status)).length;
     if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
   }
@@ -53,7 +55,7 @@
         if (alerting && changed && !prefs.recording) { Chirps.play(s.status); if (s.status === 'finished') setTimeout(() => G() && G().celebrate(), 50); }
       }
     }
-    loadedOnce = true; sessions = fresh; push();
+    loadedOnce = true; lastOk = Date.now(); sessions = fresh; push();
   }
 
   async function markSeen(id) {
@@ -83,13 +85,17 @@
     if (channel) sb.removeChannel(channel);
     channel = sb.channel('radar-sessions')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'radar_sessions' }, () => refresh())
-      .subscribe(st => { const up = st === 'SUBSCRIBED'; if (up && !connected) refresh(); connected = up; push(); });
+      .subscribe(st => { const up = st === 'SUBSCRIBED'; if (up && !rtUp) refresh(); rtUp = up; push(); });
   }
-  setInterval(() => { if (user && document.visibilityState === 'visible') refresh(); }, 60000);
+  // Safety net: every minute normally, every 15 s whenever realtime is down.
+  setInterval(() => {
+    if (user && document.visibilityState === 'visible' && !(rtUp && Date.now() - lastOk < 55000)) refresh();
+    push();
+  }, 15000);
   // iPhone pauses web apps in the background: catch up and reconnect when GoGo comes back.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible' || !user) return;
-    refresh(); if (!connected) connect(); if (prefs.awake) keepAwake(true);
+    refresh(); if (!rtUp) connect(); if (prefs.awake) keepAwake(true);
   });
   // GoGo rests: unseen "finished" results clear themselves after a while.
   setInterval(() => {

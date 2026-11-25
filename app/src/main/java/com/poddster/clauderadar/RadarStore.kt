@@ -71,6 +71,10 @@ object RadarStore {
     private var job: Job? = null
     private var channel: RealtimeChannel? = null
     private var loadedOnce = false
+    private var rtUp = false     // realtime subscription is up
+    private var lastOk = 0L      // last successful refresh
+    /** "Live" = data is arriving: realtime is up, or the last check worked recently. */
+    private fun updateConnected() { _connected.value = rtUp || System.currentTimeMillis() - lastOk < 45_000 }
     private val mutex = Mutex()
 
     fun start(scope: CoroutineScope) {
@@ -83,14 +87,18 @@ object RadarStore {
                 .launchIn(this)
             ch.status.onEach {
                 val up = it == RealtimeChannel.Status.SUBSCRIBED
-                if (up && !_connected.value) refresh() // catch up after a reconnect
-                _connected.value = up
+                val was = rtUp
+                rtUp = up
+                if (up && !was) refresh() // catch up after a reconnect
+                updateConnected()
             }.launchIn(this)
             runCatching { ch.subscribe() }.onFailure { Log.w(TAG, "subscribe failed", it) }
             // Safety net in case a realtime event is missed.
+            // Every minute normally, every 15 s whenever realtime is down.
             while (true) {
                 refresh()
-                delay(60_000)
+                updateConnected()
+                delay(if (rtUp) 60_000 else 15_000)
             }
         }
     }
@@ -101,6 +109,8 @@ object RadarStore {
         val ch = channel
         channel = null
         loadedOnce = false
+        rtUp = false
+        lastOk = 0L
         _sessions.value = emptyList()
         _connected.value = false
         if (ch != null) CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
@@ -127,7 +137,9 @@ object RadarStore {
             }
         }
         loadedOnce = true
+        lastOk = System.currentTimeMillis()
         _sessions.value = fresh
+        updateConnected()
     }
 
     suspend fun markSeen(id: String) {
